@@ -8,7 +8,7 @@ buildGoModule {
 
   buildPhase = ''
     runHook preBuild
-    go test -c -tags=integration -o integration-test ./tests/integration/
+    go test -c -tags=integration -o integration-test ./nix/tests/
     runHook postBuild
   '';
 
