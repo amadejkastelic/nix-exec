@@ -14,6 +14,8 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
+      default = pkgs.callPackage ./package.nix { };
+      defaultText = lib.literalExpression "pkgs.nix-exec";
       description = "The nix-exec package to use.";
     };
 

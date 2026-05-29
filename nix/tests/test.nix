@@ -19,7 +19,6 @@ in
 
       services.nix-exec = {
         enable = true;
-        package = nix-exec-pkg;
         settings = {
           server.name = "nix-exec-test";
           server.version = "0.1.0-test";
