@@ -20,7 +20,7 @@
           pname = "nix-exec";
           version = "0.1.0";
           src = ./.;
-          vendorHash = "";
+          vendorHash = "sha256-BlKvqBdEOPQn/ewiUX1t+THUZLbdRvpsrjnjbfeVPtw=";
         };
       });
 
