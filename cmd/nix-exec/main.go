@@ -15,6 +15,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+var version = "dev"
+
 func main() {
 	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
@@ -36,7 +38,7 @@ func main() {
 
 	s := server.NewMCPServer(
 		cfg.Server.Name,
-		cfg.Server.Version,
+		version,
 		server.WithToolCapabilities(false),
 	)
 

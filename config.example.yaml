@@ -2,7 +2,6 @@
 
 server:
   name: "nix-exec"
-  version: "0.1.0"
 
 sandbox:
   # Maximum execution time per run

@@ -51,7 +51,6 @@ func TestLoadFromFile(t *testing.T) {
 	content := `
 server:
   name: "test-server"
-  version: "2.0.0"
 sandbox:
   timeout: 60s
   max_output_bytes: 2097152
@@ -70,9 +69,6 @@ logging:
 
 	if cfg.Server.Name != "test-server" {
 		t.Errorf("expected name 'test-server', got %s", cfg.Server.Name)
-	}
-	if cfg.Server.Version != "2.0.0" {
-		t.Errorf("expected version '2.0.0', got %s", cfg.Server.Version)
 	}
 	if cfg.Sandbox.Timeout != 60*time.Second {
 		t.Errorf("expected timeout 60s, got %v", cfg.Sandbox.Timeout)

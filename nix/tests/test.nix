@@ -21,7 +21,6 @@ in
         enable = true;
         settings = {
           server.name = "nix-exec-test";
-          server.version = "0.1.0-test";
           sandbox.timeout = "5s";
           executor = {
             cache_dir = "/tmp/nix-exec-cache";

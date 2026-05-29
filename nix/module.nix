@@ -32,11 +32,6 @@ in
                 default = "nix-exec";
                 description = "Server name reported in MCP handshake.";
               };
-              version = lib.mkOption {
-                type = lib.types.str;
-                default = "0.1.0";
-                description = "Server version reported in MCP handshake.";
-              };
             };
           };
           default = { };

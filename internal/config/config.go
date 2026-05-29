@@ -17,8 +17,7 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Name    string `yaml:"name"`
-	Version string `yaml:"version"`
+	Name string `yaml:"name"`
 }
 
 type SandboxConfig struct {
@@ -44,8 +43,7 @@ func Default() *Config {
 
 	return &Config{
 		Server: ServerConfig{
-			Name:    "nix-exec",
-			Version: "0.1.0",
+			Name: "nix-exec",
 		},
 		Sandbox: SandboxConfig{
 			Timeout:         30 * time.Second,
