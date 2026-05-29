@@ -175,6 +175,8 @@ func main() {
 		{"env_vars", testEnvVars},
 		{"unsupported_language", testUnsupportedLanguage},
 		{"exit_code_propagation", testExitCodePropagation},
+		{"read_only_file_mount", testReadOnlyFileMount},
+		{"writable_file_mount", testWritableFileMount},
 	}
 
 	var passed, failed int
@@ -461,6 +463,44 @@ print(f"mean={df['score'].mean()}")`,
 	}
 	if !strings.Contains(text, "mean=91.0") {
 		return fmt.Errorf("mean calculation wrong: %s", text)
+	}
+	return nil
+}
+
+func testReadOnlyFileMount(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "bash",
+		"code":     "cat /workspace/files/test-input.txt",
+		"files":    []any{"/tmp/test-input.txt"},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	if !strings.Contains(result.Content[0].Text, "hello from file") {
+		return fmt.Errorf("file content not found: %s", result.Content[0].Text)
+	}
+	return nil
+}
+
+func testWritableFileMount(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language":       "bash",
+		"code":           "echo 'written output' > /workspace/files/test-output-dir/result.txt && cat /workspace/files/test-output-dir/result.txt",
+		"writable_files": []any{"/tmp/test-output-dir"},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	if !strings.Contains(result.Content[0].Text, "written output") {
+		return fmt.Errorf("writable file output missing: %s", result.Content[0].Text)
 	}
 	return nil
 }

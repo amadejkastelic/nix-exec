@@ -36,12 +36,14 @@ A config file is optional — sensible defaults are used if none is found. When 
 
 ### The `run_code` tool
 
-| Parameter  | Type     | Required | Description                                                              |
-|------------|----------|----------|--------------------------------------------------------------------------|
-| `language` | string   | yes      | `python`, `bash`, or `node`                                              |
-| `code`     | string   | yes      | Source code to execute                                                   |
-| `packages` | string[] | no       | Nix packages to include (e.g. `"ripgrep"`, `"python3Packages.pandas"`)  |
-| `env`      | object   | no       | Environment variables to set in the sandbox                              |
+| Parameter        | Type     | Required | Description                                                              |
+|------------------|----------|----------|--------------------------------------------------------------------------|
+| `language`       | string   | yes      | `python`, `bash`, or `node`                                              |
+| `code`           | string   | yes      | Source code to execute                                                   |
+| `packages`       | string[] | no       | Nix packages to include (e.g. `"ripgrep"`, `"python3Packages.pandas"`)  |
+| `env`            | object   | no       | Environment variables to set in the sandbox                              |
+| `files`          | string[] | no       | Host paths to mount read-only under `/workspace/files/`                  |
+| `writable_files` | string[] | no       | Host paths to mount read-write under `/workspace/files/`                 |
 
 Example — Python with pandas:
 
@@ -50,6 +52,16 @@ Example — Python with pandas:
   "language": "python",
   "code": "import pandas as pd; print(pd.__version__)",
   "packages": ["python3Packages.pandas"]
+}
+```
+
+Example — read a host file:
+
+```json
+{
+  "language": "bash",
+  "code": "cat /workspace/files/data.csv | head -5",
+  "files": ["/home/user/data.csv"]
 }
 ```
 

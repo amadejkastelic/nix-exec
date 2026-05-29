@@ -16,6 +16,7 @@ func TestBuildBwrapArgs(t *testing.T) {
 		[]string{"/env/bin/bash", "/tmp/script.sh"},
 		"/nix/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-env",
 		"/tmp/nix-exec-test",
+		nil,
 	)
 
 	expectedBinds := []struct {
@@ -63,6 +64,7 @@ func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 		[]string{"/env/bin/bash", "/tmp/script.sh"},
 		"/nix/store/abc-env",
 		"/tmp/sandbox",
+		nil,
 	)
 
 	found := false
@@ -75,6 +77,43 @@ func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected workspace bind mount not found")
+	}
+}
+
+func TestBuildBwrapArgsWithFileMounts(t *testing.T) {
+	cfg := config.Default()
+	logger := slog.Default()
+	sb := New(cfg, logger)
+
+	mounts := []FileMount{
+		{HostPath: "/host/data.csv", Writable: false},
+		{HostPath: "/host/output", Writable: true},
+	}
+
+	args := sb.buildBwrapArgs(
+		[]string{"/env/bin/bash", "/tmp/script.sh"},
+		"/nix/store/abc-env",
+		"/tmp/sandbox",
+		mounts,
+	)
+
+	roFound := false
+	rwFound := false
+	for i := 0; i < len(args)-2; i++ {
+		if args[i] == "--ro-bind" && args[i+1] == "/host/data.csv" &&
+			args[i+2] == "/workspace/files/data.csv" {
+			roFound = true
+		}
+		if args[i] == "--bind" && args[i+1] == "/host/output" &&
+			args[i+2] == "/workspace/files/output" {
+			rwFound = true
+		}
+	}
+	if !roFound {
+		t.Error("expected read-only file mount not found")
+	}
+	if !rwFound {
+		t.Error("expected writable file mount not found")
 	}
 }
 

@@ -6,9 +6,15 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
 )
+
+type FileMount struct {
+	HostPath string
+	Writable bool
+}
 
 type Sandbox struct {
 	config *config.Config
@@ -35,8 +41,9 @@ func (s *Sandbox) Run(
 	envPath string,
 	tmpDir string,
 	envVars []string,
+	fileMounts []FileMount,
 ) (*RunResult, error) {
-	args := s.buildBwrapArgs(command, envPath, tmpDir)
+	args := s.buildBwrapArgs(command, envPath, tmpDir, fileMounts)
 
 	s.logger.Debug("running sandboxed command",
 		"args", args,
@@ -74,7 +81,12 @@ func (s *Sandbox) Run(
 	return result, nil
 }
 
-func (s *Sandbox) buildBwrapArgs(command []string, envPath string, tmpDir string) []string {
+func (s *Sandbox) buildBwrapArgs(
+	command []string,
+	envPath string,
+	tmpDir string,
+	fileMounts []FileMount,
+) []string {
 	args := []string{
 		"--unshare-all",
 		"--die-with-parent",
@@ -84,10 +96,20 @@ func (s *Sandbox) buildBwrapArgs(command []string, envPath string, tmpDir string
 		"--dev", "/dev",
 		"--proc", "/proc",
 		"--dir", "/workspace",
+		"--dir", "/workspace/files",
 	}
 
 	if s.config.Sandbox.WorkspacePath != "" {
 		args = append(args, "--ro-bind", s.config.Sandbox.WorkspacePath, "/workspace")
+	}
+
+	for _, fm := range fileMounts {
+		dest := filepath.Join("/workspace/files", filepath.Base(fm.HostPath))
+		if fm.Writable {
+			args = append(args, "--bind", fm.HostPath, dest)
+		} else {
+			args = append(args, "--ro-bind", fm.HostPath, dest)
+		}
 	}
 
 	args = append(args, "--")

@@ -45,6 +45,7 @@ func (e *Executor) RunCode(
 	lang, code string,
 	packages []string,
 	envVars map[string]string,
+	fileMounts []sandbox.FileMount,
 ) (*ExecutionResult, error) {
 	interpreter, err := resolveInterpreter(lang)
 	if err != nil {
@@ -93,7 +94,14 @@ func (e *Executor) RunCode(
 		sandboxEnv = append(sandboxEnv, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	result, err := e.sandbox.Run(ctx, command, envPath, tmpDir, sandboxEnv)
+	result, err := e.sandbox.Run(
+		ctx,
+		command,
+		envPath,
+		tmpDir,
+		sandboxEnv,
+		fileMounts,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -181,8 +189,8 @@ func generateFlake(lang string, packages []string, nixpkgsURL string) string {
 		var otherPkgs []string
 
 		for _, pkg := range packages {
-			if strings.HasPrefix(pkg, "python3Packages.") {
-				pythonPkgs = append(pythonPkgs, strings.TrimPrefix(pkg, "python3Packages."))
+			if after, ok := strings.CutPrefix(pkg, "python3Packages."); ok {
+				pythonPkgs = append(pythonPkgs, after)
 			} else if pkg == "python3" {
 				// handled by withPackages below
 			} else {

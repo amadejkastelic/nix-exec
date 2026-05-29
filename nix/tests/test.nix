@@ -71,6 +71,9 @@ in
     machine.succeed("which bwrap")
     machine.succeed("which nix")
 
+    machine.succeed("echo 'hello from file' > /tmp/test-input.txt")
+    machine.succeed("mkdir -p /tmp/test-output-dir")
+
     machine.succeed(
       "NIX_EXEC_TEST_CONFIG=/etc/nix-exec/config.yaml "
       + "${test-pkg}/bin/tests 2>&1 | tee /dev/console"

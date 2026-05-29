@@ -67,6 +67,18 @@ func main() {
 		mcp.WithObject("env",
 			mcp.Description("Environment variables to set in the sandbox"),
 		),
+		mcp.WithArray("files",
+			mcp.Description(
+				"Host paths to mount read-only in the sandbox under /workspace/files/",
+			),
+			mcp.Items(map[string]any{"type": "string"}),
+		),
+		mcp.WithArray("writable_files",
+			mcp.Description(
+				"Host paths to mount read-write in the sandbox under /workspace/files/",
+			),
+			mcp.Items(map[string]any{"type": "string"}),
+		),
 	)
 
 	s.AddTool(
@@ -94,12 +106,36 @@ func main() {
 				}
 			}
 
+			var fileMounts []sandbox.FileMount
+			for _, p := range request.GetStringSlice("files", nil) {
+				fileMounts = append(
+					fileMounts,
+					sandbox.FileMount{HostPath: p},
+				)
+			}
+			for _, p := range request.GetStringSlice("writable_files", nil) {
+				fileMounts = append(
+					fileMounts,
+					sandbox.FileMount{
+						HostPath: p,
+						Writable: true,
+					},
+				)
+			}
+
 			logger.Info("executing code", "language", language, "packages", packages)
 
 			ctx, cancel := context.WithTimeout(ctx, cfg.Sandbox.Timeout)
 			defer cancel()
 
-			result, err := ex.RunCode(ctx, language, code, packages, envVars)
+			result, err := ex.RunCode(
+				ctx,
+				language,
+				code,
+				packages,
+				envVars,
+				fileMounts,
+			)
 			if err != nil {
 				logger.Error("execution failed", "error", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Execution failed: %v", err)), nil
