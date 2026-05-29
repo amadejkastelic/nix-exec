@@ -5,6 +5,7 @@
 }:
 let
   nix-exec-pkg = self.packages.${system}.default;
+  test-pkg = self.packages.${system}.test;
   nixpkgs-path = toString nixpkgs;
 in
 {
@@ -17,7 +18,6 @@ in
       environment.systemPackages = [
         nix-exec-pkg
         pkgs.bubblewrap
-        pkgs.python3
       ];
 
       nix.enable = true;
@@ -46,51 +46,15 @@ in
       '';
     };
 
-  testScript =
-    let
-      test-script = ./run_tests.py;
-    in
-    ''
-      import json
+  testScript = ''
+    machine.wait_for_unit("multi-user.target")
+    machine.succeed("which nix-exec")
+    machine.succeed("which bwrap")
+    machine.succeed("which nix")
 
-      machine.wait_for_unit("multi-user.target")
-      machine.succeed("which nix-exec")
-      machine.succeed("which bwrap")
-      machine.succeed("which nix")
-
-      with subtest("MCP initialize handshake"):
-          result = machine.succeed(
-              "printf '%s' '"
-              + '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
-              + "' | timeout 10 nix-exec --config /etc/nix-exec/test-config.yaml 2>/dev/null"
-          )
-          resp = json.loads(result.strip().split("\\n")[0])
-          assert resp["id"] == 1
-          assert resp["result"]["serverInfo"]["name"] == "nix-exec-test"
-          assert "tools" in resp["result"]["capabilities"]
-
-      with subtest("MCP tools/list"):
-          result = machine.succeed(
-              "printf '%s\\n%s\\n%s' '"
-              + '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
-              + "' '"
-              + '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-              + "' '"
-              + '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
-              + "' | timeout 10 nix-exec --config /etc/nix-exec/test-config.yaml 2>/dev/null"
-          )
-          lines = result.strip().split("\\n")
-          resp = json.loads(lines[-1])
-          assert resp["id"] == 2
-          tools = resp["result"]["tools"]
-          run_code = next((t for t in tools if t["name"] == "run_code"), None)
-          assert run_code is not None
-          assert "language" in run_code["inputSchema"]["properties"]
-          assert "code" in run_code["inputSchema"]["properties"]
-
-      with subtest("Full integration test suite"):
-          machine.succeed("python3 ${test-script} 2>&1 | tee /tmp/test-output.txt")
-          machine.succeed("grep 'Results:' /tmp/test-output.txt")
-          machine.fail("grep 'FAIL:' /tmp/test-output.txt")
-    '';
+    machine.succeed(
+      "NIX_EXEC_TEST_CONFIG=/etc/nix-exec/test-config.yaml "
+      + "${test-pkg}/bin/nix-exec-integration-test -test.v -test.timeout 600s 2>&1"
+    )
+  '';
 }

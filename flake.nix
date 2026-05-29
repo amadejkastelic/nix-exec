@@ -17,6 +17,7 @@
     {
       packages = forAllSystems (pkgs: {
         default = pkgs.callPackage ./nix/package.nix { };
+        test = pkgs.callPackage ./nix/test.nix { };
       });
 
       devShells = forAllSystems (pkgs: {
