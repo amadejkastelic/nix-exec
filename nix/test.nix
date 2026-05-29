@@ -4,7 +4,7 @@ buildGoModule {
   pname = "nix-exec-integration";
   version = "0.1.0";
   src = ./..;
-  vendorHash = "";
+  vendorHash = "sha256-TNGu96NH5DSdsHfjiPXT0twuOCsVlc4kpFULb+ebbLE=";
 
   buildPhase = ''
     runHook preBuild
