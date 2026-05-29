@@ -25,23 +25,25 @@
         );
     in
     {
-      packages = forAllSystems (pkgs: {
-        default = pkgs.callPackage ./nix/package.nix { };
-        test = pkgs.callPackage ./nix/tests/package.nix { };
-      });
+      packages = forAllSystems (
+        pkgs: _system: {
+          default = pkgs.callPackage ./nix/package.nix { };
+          test = pkgs.callPackage ./nix/tests/package.nix { };
+        }
+      );
 
       devShells = forAllSystems (
-        pkgs: system:
-        pkgs.callPackage ./nix/shell.nix {
-          preCommitCheck = self.checks.${system}.pre-commit-check;
+        pkgs: system: {
+          default = pkgs.callPackage ./nix/shell.nix {
+            preCommitCheck = self.checks.${system}.pre-commit-check;
+          };
         }
       );
 
       nixosModules.default = import ./nix/module.nix;
 
       checks = forAllSystems (
-        pkgs: system:
-        {
+        pkgs: system: {
           integration = (pkgs.testers.nixosTest or pkgs.nixosTest) (
             import ./nix/tests/test.nix {
               inherit self nixpkgs;
@@ -55,27 +57,5 @@
           };
         }
       );
-
-      devShells = forAllSystems (pkgs: {
-        default = pkgs.callPackage ./nix/shell.nix {
-          inherit preCommitCheck;
-        };
-      });
-
-      nixosModules.default = import ./nix/module.nix;
-
-      checks = forAllSystems (pkgs: {
-        integration = (pkgs.testers.nixosTest or pkgs.nixosTest) (
-          import ./nix/tests/test.nix {
-            inherit self nixpkgs;
-            system = pkgs.stdenv.hostPlatform.system;
-          }
-        );
-
-        pre-commit-check = import ./nix/pre-commit.nix {
-          inherit pkgs;
-          preCommitHooks = pre-commit-hooks.lib.${pkgs.stdenv.hostPlatform.system};
-        };
-      });
     };
 }
