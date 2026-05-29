@@ -61,7 +61,7 @@ func (e *Executor) RunCode(
 
 	allPackages := withInterpreterPackage(lang, packages)
 
-	envPath, err := e.buildEnvironment(ctx, allPackages)
+	envPath, err := e.buildEnvironment(ctx, lang, allPackages)
 	if err != nil {
 		return nil, fmt.Errorf("build environment: %w", err)
 	}
@@ -106,13 +106,17 @@ func (e *Executor) RunCode(
 	}, nil
 }
 
-func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (string, error) {
+func (e *Executor) buildEnvironment(
+	ctx context.Context,
+	lang string,
+	packages []string,
+) (string, error) {
 	if len(packages) == 0 {
 		packages = []string{"bash"}
 	}
 
 	sort.Strings(packages)
-	key := cacheKey(packages)
+	key := cacheKey(lang, packages)
 
 	if cached, ok := e.cache.Get(key); ok {
 		e.logger.Debug("using cached environment", "key", key, "path", cached)
@@ -129,7 +133,7 @@ func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (str
 		}
 	}()
 
-	flakeContent := generateFlake(packages, e.config.Executor.NixpkgsURL)
+	flakeContent := generateFlake(lang, packages, e.config.Executor.NixpkgsURL)
 	if err := os.WriteFile(
 		filepath.Join(flakeDir, "flake.nix"),
 		[]byte(flakeContent),
@@ -140,11 +144,15 @@ func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (str
 
 	e.logger.Info("building nix environment", "packages", packages)
 
-	cmd := exec.CommandContext(ctx,
-		"nix",
+	args := []string{
 		"--extra-experimental-features", "nix-command flakes",
-		"build", "--no-link", "--print-out-paths", ".",
-	)
+	}
+	if subs := e.config.Executor.Substituters; subs != nil {
+		args = append(args, "--option", "substituters", strings.Join(subs, " "))
+	}
+	args = append(args, "build", "--no-link", "--print-out-paths", ".")
+
+	cmd := exec.CommandContext(ctx, "nix", args...)
 	cmd.Dir = flakeDir
 
 	output, err := cmd.Output()
@@ -163,19 +171,50 @@ func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (str
 	return storePath, nil
 }
 
-func generateFlake(packages []string, nixpkgsURL string) string {
+func generateFlake(lang string, packages []string, nixpkgsURL string) string {
 	system := nixSystem()
 
 	var pathsBuilder strings.Builder
-	for _, pkg := range packages {
-		fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
+
+	if lang == "python" {
+		var pythonPkgs []string
+		var otherPkgs []string
+
+		for _, pkg := range packages {
+			if strings.HasPrefix(pkg, "python3Packages.") {
+				pythonPkgs = append(pythonPkgs, strings.TrimPrefix(pkg, "python3Packages."))
+			} else if pkg == "python3" {
+				// handled by withPackages below
+			} else {
+				otherPkgs = append(otherPkgs, pkg)
+			}
+		}
+
+		if len(pythonPkgs) > 0 {
+			fmt.Fprintf(&pathsBuilder, "      (pkgs.python3.withPackages (ps: [\n")
+			for _, p := range pythonPkgs {
+				fmt.Fprintf(&pathsBuilder, "        ps.%s\n", p)
+			}
+			fmt.Fprintf(&pathsBuilder, "      ]))\n")
+		} else {
+			fmt.Fprintf(&pathsBuilder, "      pkgs.python3\n")
+		}
+
+		for _, pkg := range otherPkgs {
+			fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
+		}
+	} else {
+		for _, pkg := range packages {
+			fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
+		}
 	}
 
 	return fmt.Sprintf(`{
   inputs.nixpkgs.url = "%s";
 
-  outputs = { nixpkgs, ... }: {
-    packages.%s.default = nixpkgs.legacyPackages.%s.buildEnv {
+  outputs = { nixpkgs, ... }:
+    let pkgs = nixpkgs.legacyPackages.%s; in {
+    packages.%s.default = pkgs.buildEnv {
       name = "nix-exec-env";
       paths = [
 %s      ];
@@ -186,21 +225,25 @@ func generateFlake(packages []string, nixpkgsURL string) string {
 }
 
 func nixSystem() string {
-	switch runtime.GOARCH {
-	case "amd64":
+	switch runtime.GOOS + "/" + runtime.GOARCH {
+	case "linux/amd64":
 		return "x86_64-linux"
-	case "arm64":
+	case "linux/arm64":
 		return "aarch64-linux"
-	case "arm":
+	case "linux/arm":
 		return "armv7l-linux"
+	case "darwin/amd64":
+		return "x86_64-darwin"
+	case "darwin/arm64":
+		return "aarch64-darwin"
 	default:
 		return "x86_64-linux"
 	}
 }
 
-func cacheKey(packages []string) string {
+func cacheKey(lang string, packages []string) string {
 	h := sha256.New()
-	h.Write([]byte(strings.Join(packages, ",")))
+	h.Write([]byte(lang + ":" + strings.Join(packages, ",")))
 	return hex.EncodeToString(h.Sum(nil))
 }
 

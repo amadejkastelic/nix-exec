@@ -14,6 +14,32 @@ in
 
   nodes.machine =
     { pkgs, ... }:
+    let
+      mkEnv =
+        paths:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = paths;
+        };
+
+      mkPythonEnv =
+        pythonPkgs:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = [ (pkgs.python3.withPackages pythonPkgs) ];
+        };
+
+      testEnvs = [
+        (mkEnv [ pkgs.bash ])
+        (mkEnv [
+          pkgs.bash
+          pkgs.jq
+        ])
+        (mkEnv [ pkgs.python3 ])
+        (mkEnv [ pkgs.nodejs ])
+        (mkPythonEnv (ps: [ ps.pandas ]))
+      ];
+    in
     {
       imports = [ self.nixosModules.default ];
 
@@ -25,6 +51,7 @@ in
           executor = {
             cache_dir = "/tmp/nix-exec-cache";
             nixpkgs_url = "path:${nixpkgs-path}";
+            substituters = [ ];
           };
           logging = {
             level = "debug";
@@ -35,6 +62,8 @@ in
 
       virtualisation.memorySize = 4096;
       virtualisation.diskSize = 8192;
+      virtualisation.writableStore = true;
+      virtualisation.additionalPaths = testEnvs;
     };
 
   testScript = ''
@@ -45,7 +74,7 @@ in
 
     machine.succeed(
       "NIX_EXEC_TEST_CONFIG=/etc/nix-exec/config.yaml "
-      + "${test-pkg}/bin/nix-exec-integration-test -test.v -test.timeout 600s 2>&1"
+      + "${test-pkg}/bin/tests 2>&1 | tee /dev/console"
     )
   '';
 }

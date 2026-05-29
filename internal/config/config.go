@@ -28,9 +28,10 @@ type SandboxConfig struct {
 }
 
 type ExecutorConfig struct {
-	CacheDir   string `yaml:"cache_dir"`
-	TempDir    string `yaml:"temp_dir"`
-	NixpkgsURL string `yaml:"nixpkgs_url"`
+	CacheDir     string   `yaml:"cache_dir"`
+	TempDir      string   `yaml:"temp_dir"`
+	NixpkgsURL   string   `yaml:"nixpkgs_url"`
+	Substituters []string `yaml:"substituters"`
 }
 
 type LoggingConfig struct {

@@ -80,9 +80,10 @@ func TestScriptExtension(t *testing.T) {
 }
 
 func TestCacheKey(t *testing.T) {
-	key1 := cacheKey([]string{"bash", "python3"})
-	key2 := cacheKey([]string{"bash", "python3"})
-	key3 := cacheKey([]string{"bash"})
+	key1 := cacheKey("python", []string{"bash", "python3"})
+	key2 := cacheKey("python", []string{"bash", "python3"})
+	key3 := cacheKey("python", []string{"bash"})
+	key4 := cacheKey("bash", []string{"bash", "python3"})
 
 	if key1 != key2 {
 		t.Error("cacheKey should be deterministic for same input")
@@ -92,28 +93,66 @@ func TestCacheKey(t *testing.T) {
 		t.Error("cacheKey should differ for different package sets")
 	}
 
+	if key1 == key4 {
+		t.Error("cacheKey should differ for different languages")
+	}
+
 	if len(key1) != 64 {
 		t.Errorf("cacheKey should be 64 hex chars (sha256), got %d", len(key1))
 	}
 }
 
 func TestGenerateFlake(t *testing.T) {
-	flake := generateFlake([]string{"python3", "ripgrep"}, "github:NixOS/nixpkgs/nixpkgs-unstable")
-
-	if flake == "" {
-		t.Fatal("generateFlake returned empty string")
-	}
-
-	wantPkgs := []string{"pkgs.python3", "pkgs.ripgrep"}
-	for _, pkg := range wantPkgs {
-		if !contains(flake, pkg) {
-			t.Errorf("generated flake missing %q", pkg)
+	t.Run("default", func(t *testing.T) {
+		flake := generateFlake(
+			"bash",
+			[]string{"bash", "ripgrep"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if flake == "" {
+			t.Fatal("generateFlake returned empty string")
 		}
-	}
+		wantPkgs := []string{"pkgs.bash", "pkgs.ripgrep"}
+		for _, pkg := range wantPkgs {
+			if !contains(flake, pkg) {
+				t.Errorf("generated flake missing %q", pkg)
+			}
+		}
+		if !contains(flake, "buildEnv") {
+			t.Error("generated flake missing buildEnv")
+		}
+	})
 
-	if !contains(flake, "buildEnv") {
-		t.Error("generated flake missing buildEnv")
-	}
+	t.Run("python_with_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"python",
+			[]string{"python3", "python3Packages.pandas"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("python flake should use withPackages")
+		}
+		if !contains(flake, "ps.pandas") {
+			t.Error("python flake should reference ps.pandas")
+		}
+		if contains(flake, "pkgs.python3Packages.pandas") {
+			t.Error("python flake should not reference python3Packages directly in paths")
+		}
+	})
+
+	t.Run("python_no_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"python",
+			[]string{"python3"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "pkgs.python3\n") {
+			t.Error("python flake without packages should use pkgs.python3 directly")
+		}
+		if contains(flake, "withPackages") {
+			t.Error("python flake without packages should not use withPackages")
+		}
+	})
 }
 
 func contains(s, sub string) bool {

@@ -1,0 +1,38 @@
+name: Checks
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.nix"
+      - "**/*.go"
+      - "flake.lock"
+      - "go.sum"
+      - ".github/workflows/*.yaml"
+      - ".github/workflows/*.yml"
+  pull_request:
+    paths:
+      - "**/*.nix"
+      - "**/*.go"
+      - "flake.lock"
+      - "go.sum"
+      - ".github/workflows/*.yaml"
+      - ".github/workflows/*.yml"
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      matrix:
+        command:
+          - nix flake check -L
+
+    uses: ./.github/workflows/nix.yaml
+    with:
+      command: ${{ matrix.command }}
+
+  build:
+    needs: check
+    uses: ./.github/workflows/build.yaml
+    secrets: inherit

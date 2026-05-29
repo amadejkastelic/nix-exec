@@ -59,12 +59,49 @@ func newMCPClient() (*mcpClient, error) {
 }
 
 func (c *mcpClient) close() {
-	c.stdin.Close()
-	c.cmd.Process.Kill()
-	c.cmd.Wait()
+	_ = c.stdin.Close()
+	_ = c.cmd.Process.Kill()
+	_ = c.cmd.Wait()
 }
 
-func (c *mcpClient) send(method string, params any) int {
+func (c *mcpClient) send(msg map[string]any) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	if _, err := c.stdin.Write(append(data, '\n')); err != nil {
+		return fmt.Errorf("write: %w", err)
+	}
+	return nil
+}
+
+func (c *mcpClient) notify(method string) {
+	msg := map[string]any{"jsonrpc": "2.0", "method": method}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "marshal notify: %v\n", err)
+		return
+	}
+	if _, err := c.stdin.Write(append(data, '\n')); err != nil {
+		fmt.Fprintf(os.Stderr, "write notify: %v\n", err)
+	}
+}
+
+func (c *mcpClient) recv() jsonrpcMessage {
+	line, err := c.stdout.ReadBytes('\n')
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read response: %v\n", err)
+		os.Exit(1)
+	}
+	var msg jsonrpcMessage
+	if err := json.Unmarshal(line, &msg); err != nil {
+		fmt.Fprintf(os.Stderr, "unmarshal: %v\nraw: %s\n", err, line)
+		os.Exit(1)
+	}
+	return msg
+}
+
+func (c *mcpClient) call(method string, params any) jsonrpcMessage {
 	id := c.nextID
 	c.nextID++
 	msg := map[string]any{
@@ -75,34 +112,14 @@ func (c *mcpClient) send(method string, params any) int {
 	if params != nil {
 		msg["params"] = params
 	}
-	data, _ := json.Marshal(msg)
-	c.stdin.Write(append(data, '\n'))
-	return id
-}
-
-func (c *mcpClient) notify(method string) {
-	msg := map[string]any{"jsonrpc": "2.0", "method": method}
-	data, _ := json.Marshal(msg)
-	c.stdin.Write(append(data, '\n'))
-}
-
-func (c *mcpClient) recv() jsonrpcMessage {
-	line, err := c.stdout.ReadBytes('\n')
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "read response: %v\n", err)
+	if err := c.send(msg); err != nil {
+		fmt.Fprintf(os.Stderr, "send: %v\n", err)
 		os.Exit(1)
 	}
-	var msg jsonrpcMessage
-	json.Unmarshal(line, &msg)
-	return msg
-}
-
-func (c *mcpClient) call(method string, params any) jsonrpcMessage {
-	id := c.send(method, params)
 	for {
-		msg := c.recv()
-		if msg.ID != nil && *msg.ID == id {
-			return msg
+		resp := c.recv()
+		if resp.ID != nil && *resp.ID == id {
+			return resp
 		}
 	}
 }
@@ -148,7 +165,10 @@ func main() {
 		{"tools_list", testToolsList},
 		{"bash_echo", testBashEcho},
 		{"bash_caching", testBashCaching},
+		{"bash_with_jq", testBashWithJq},
 		{"python_execution", testPythonExecution},
+		{"python_with_pandas", testPythonWithPandas},
+		{"node_execution", testNodeExecution},
 		{"filesystem_isolation", testFilesystemIsolation},
 		{"network_isolation", testNetworkIsolation},
 		{"timeout_enforcement", testTimeoutEnforcement},
@@ -184,8 +204,10 @@ func testInitialize(c *mcpClient) error {
 		return fmt.Errorf("initialize error: %s", resp.Error.Message)
 	}
 	var result struct {
-		ServerInfo   struct{ Name string `json:"name"` } `json:"serverInfo"`
-		Capabilities map[string]any                      `json:"capabilities"`
+		ServerInfo struct {
+			Name string `json:"name"`
+		} `json:"serverInfo"`
+		Capabilities map[string]any `json:"capabilities"`
 	}
 	if err := json.Unmarshal(resp.Result, &result); err != nil {
 		return fmt.Errorf("unmarshal: %w", err)
@@ -306,9 +328,9 @@ func testFilesystemIsolation(c *mcpClient) error {
 		return err
 	}
 	text := result.Content[0].Text
-	if !(strings.Contains(text, "Permission denied") ||
-		strings.Contains(text, "Read-only") ||
-		strings.Contains(text, "exit=1")) {
+	if !strings.Contains(text, "Permission denied") &&
+		!strings.Contains(text, "Read-only") &&
+		!strings.Contains(text, "exit=1") {
 		return fmt.Errorf("filesystem not isolated: %s", text)
 	}
 	return nil
@@ -332,7 +354,7 @@ func testNetworkIsolation(c *mcpClient) error {
 func testTimeoutEnforcement(c *mcpClient) error {
 	resp := c.callTool("run_code", map[string]any{
 		"language": "bash",
-		"code":     "echo 'starting'; sleep 30; echo 'should not reach'",
+		"code":     "echo 'starting'; i=0; while true; do i=$((i+1)); done",
 	})
 	result, err := parseToolResult(resp)
 	if err != nil {
@@ -392,6 +414,71 @@ func testExitCodePropagation(c *mcpClient) error {
 	}
 	if !strings.Contains(result.Content[0].Text, "Exit code: 42") {
 		return fmt.Errorf("exit code not propagated: %s", result.Content[0].Text)
+	}
+	return nil
+}
+
+func testBashWithJq(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "bash",
+		"code":     `echo '{"name":"nix-exec","status":"ok"}' | jq -r .name`,
+		"packages": []any{"jq"},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	if !strings.Contains(result.Content[0].Text, "nix-exec") {
+		return fmt.Errorf("jq output missing: %s", result.Content[0].Text)
+	}
+	return nil
+}
+
+func testPythonWithPandas(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "python",
+		"code": `import pandas as pd
+df = pd.DataFrame({"name": ["alice", "bob"], "score": [95, 87]})
+print(df.to_string(index=False))
+print(f"mean={df['score'].mean()}")`,
+		"packages": []any{
+			"python3Packages.pandas",
+		},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "alice") || !strings.Contains(text, "bob") {
+		return fmt.Errorf("dataframe output missing: %s", text)
+	}
+	if !strings.Contains(text, "mean=91.0") {
+		return fmt.Errorf("mean calculation wrong: %s", text)
+	}
+	return nil
+}
+
+func testNodeExecution(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "node",
+		"code":     `const v = process.versions.node.split('.')[0]; console.log("node " + v);`,
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	if !strings.Contains(result.Content[0].Text, "node ") {
+		return fmt.Errorf("node output missing: %s", result.Content[0].Text)
 	}
 	return nil
 }

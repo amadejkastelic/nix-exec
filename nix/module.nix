@@ -85,6 +85,11 @@ in
                 default = "github:NixOS/nixpkgs/nixpkgs-unstable";
                 description = "Nixpkgs flake URL used to resolve packages.";
               };
+              substituters = lib.mkOption {
+                type = lib.types.nullOr (lib.types.listOf lib.types.str);
+                default = null;
+                description = "Nix substituters. Set to [] to disable, null uses system defaults.";
+              };
             };
           };
           default = { };

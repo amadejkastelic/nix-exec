@@ -22,7 +22,7 @@ in
 preCommitHooks.run {
   src = ../.;
   hooks = {
-    nixfmt-rfc-style.enable = true;
+    nixfmt.enable = true;
     golangci-lint = {
       enable = true;
       extraPackages = [
