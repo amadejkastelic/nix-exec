@@ -2,8 +2,16 @@
   pkgs,
   preCommitHooks,
 }:
+
 let
-  deps = (pkgs.callPackage ./package.nix { }).goModules;
+  deps =
+    (pkgs.buildGoModule {
+      pname = "nix-exec-modules";
+      version = "dev";
+      src = ../.;
+      proxyVendor = true;
+      vendorHash = "sha256-THTp9T9s0lb5++sasngQhbFCN0cEIofHAM4Md73yO/E=";
+    }).goModules;
 
   goWithProxy = pkgs.writeShellScriptBin "go" ''
     export GOPROXY="file://${deps}"
@@ -17,11 +25,11 @@ preCommitHooks.run {
     nixfmt-rfc-style.enable = true;
     golangci-lint = {
       enable = true;
-      extraPackages = with pkgs; [
+      extraPackages = [
         goWithProxy
-        gofumpt
-        golines
-        gotools
+        pkgs.gofumpt
+        pkgs.golines
+        pkgs.gotools
       ];
     };
     gotest = {
