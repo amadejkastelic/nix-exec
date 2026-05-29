@@ -121,7 +121,7 @@ func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (str
 	}
 	defer os.RemoveAll(flakeDir)
 
-	flakeContent := generateFlake(packages)
+	flakeContent := generateFlake(packages, e.config.Executor.NixpkgsURL)
 	if err := os.WriteFile(filepath.Join(flakeDir, "flake.nix"), []byte(flakeContent), 0644); err != nil {
 		return "", fmt.Errorf("write flake: %w", err)
 	}
@@ -151,7 +151,7 @@ func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (str
 	return storePath, nil
 }
 
-func generateFlake(packages []string) string {
+func generateFlake(packages []string, nixpkgsURL string) string {
 	system := nixSystem()
 
 	var pathsBuilder strings.Builder
@@ -160,7 +160,7 @@ func generateFlake(packages []string) string {
 	}
 
 	return fmt.Sprintf(`{
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.nixpkgs.url = "%s";
 
   outputs = { nixpkgs, ... }: {
     packages.%s.default = nixpkgs.legacyPackages.%s.buildEnv {
@@ -170,7 +170,7 @@ func generateFlake(packages []string) string {
     };
   };
 }
-`, system, system, pathsBuilder.String())
+`, nixpkgsURL, system, system, pathsBuilder.String())
 }
 
 func nixSystem() string {

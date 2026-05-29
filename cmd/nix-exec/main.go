@@ -85,6 +85,9 @@ func main() {
 
 		logger.Info("executing code", "language", language, "packages", packages)
 
+		ctx, cancel := context.WithTimeout(ctx, cfg.Sandbox.Timeout)
+		defer cancel()
+
 		result, err := ex.RunCode(ctx, language, code, packages, envVars)
 		if err != nil {
 			logger.Error("execution failed", "error", err)

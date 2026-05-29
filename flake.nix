@@ -16,27 +16,21 @@
     in
     {
       packages = forAllSystems (pkgs: {
-        default = pkgs.buildGoModule {
-          pname = "nix-exec";
-          version = "0.1.0";
-          src = ./.;
-          vendorHash = "sha256-BlKvqBdEOPQn/ewiUX1t+THUZLbdRvpsrjnjbfeVPtw=";
-        };
+        default = pkgs.callPackage ./nix/package.nix { };
       });
 
       devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            go
-            gotools
-            gopls
-            bubblewrap
-          ];
+        default = pkgs.callPackage ./nix/shell.nix { };
+      });
 
-          shellHook = ''
-            echo "nix-exec dev shell ready"
-          '';
-        };
+      checks = forAllSystems (pkgs: {
+        integration =
+          (pkgs.testers.nixosTest or pkgs.nixosTest) (
+            import ./nix/tests/integration.nix {
+              inherit self nixpkgs;
+              system = pkgs.stdenv.hostPlatform.system;
+            }
+          );
       });
     };
 }

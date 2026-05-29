@@ -29,8 +29,9 @@ type SandboxConfig struct {
 }
 
 type ExecutorConfig struct {
-	CacheDir string `yaml:"cache_dir"`
-	TempDir  string `yaml:"temp_dir"`
+	CacheDir    string `yaml:"cache_dir"`
+	TempDir     string `yaml:"temp_dir"`
+	NixpkgsURL  string `yaml:"nixpkgs_url"`
 }
 
 type LoggingConfig struct {
@@ -53,8 +54,9 @@ func Default() *Config {
 			PackageDenylist: []string{},
 		},
 		Executor: ExecutorConfig{
-			CacheDir: filepath.Join(home, ".cache", "nix-exec"),
-			TempDir:  os.TempDir(),
+			CacheDir:   filepath.Join(home, ".cache", "nix-exec"),
+			TempDir:    os.TempDir(),
+			NixpkgsURL: "github:NixOS/nixpkgs/nixpkgs-unstable",
 		},
 		Logging: LoggingConfig{
 			Level:  "info",

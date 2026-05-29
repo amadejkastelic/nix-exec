@@ -92,7 +92,7 @@ func TestCacheKey(t *testing.T) {
 }
 
 func TestGenerateFlake(t *testing.T) {
-	flake := generateFlake([]string{"python3", "ripgrep"})
+	flake := generateFlake([]string{"python3", "ripgrep"}, "github:NixOS/nixpkgs/nixpkgs-unstable")
 
 	if flake == "" {
 		t.Fatal("generateFlake returned empty string")
