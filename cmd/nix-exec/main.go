@@ -15,13 +15,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-type RunCodeArgs struct {
-	Language string            `json:"language" jsonschema:"required,enum=python,enum=bash,enum=node" jsonschema_description:"Programming language to execute"`
-	Code     string            `json:"code" jsonschema:"required" jsonschema_description:"Source code to execute"`
-	Packages []string          `json:"packages,omitempty" jsonschema_description:"Nix packages to include in the environment"`
-	Env      map[string]string `json:"env,omitempty" jsonschema_description:"Environment variables to set in the sandbox"`
-}
-
 func main() {
 	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
@@ -39,7 +32,7 @@ func main() {
 	logger := setupLogger(cfg)
 
 	sb := sandbox.New(cfg, logger)
-	exec := executor.New(cfg, sb, logger)
+	ex := executor.New(cfg, sb, logger)
 
 	s := server.NewMCPServer(
 		cfg.Server.Name,
@@ -49,25 +42,57 @@ func main() {
 
 	runCodeTool := mcp.NewTool("run_code",
 		mcp.WithDescription("Execute code in a secure, sandboxed Nix environment. Supports Python, Bash, and Node.js. Specify packages for dependencies."),
-		mcp.WithInputSchema[RunCodeArgs](),
+		mcp.WithString("language",
+			mcp.Required(),
+			mcp.Description("Programming language to execute"),
+			mcp.Enum("python", "bash", "node"),
+		),
+		mcp.WithString("code",
+			mcp.Required(),
+			mcp.Description("Source code to execute"),
+		),
+		mcp.WithArray("packages",
+			mcp.Description("Nix packages to include in the environment (e.g. 'ripgrep', 'python3Packages.pandas')"),
+			mcp.Items(map[string]any{"type": "string"}),
+		),
+		mcp.WithObject("env",
+			mcp.Description("Environment variables to set in the sandbox"),
+		),
 	)
 
-	s.AddTool(runCodeTool, mcp.NewTypedToolHandler(func(
-		ctx context.Context,
-		request mcp.CallToolRequest,
-		args RunCodeArgs,
-	) (*mcp.CallToolResult, error) {
-		logger.Info("executing code", "language", args.Language, "packages", args.Packages)
+	s.AddTool(runCodeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		language, err := request.RequireString("language")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 
-		result, err := exec.RunCode(ctx, args.Language, args.Code, args.Packages, args.Env)
+		code, err := request.RequireString("code")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		packages := request.GetStringSlice("packages", nil)
+		envVars := make(map[string]string)
+		if args := request.GetArguments(); args != nil {
+			if env, ok := args["env"].(map[string]any); ok {
+				for k, v := range env {
+					if s, ok := v.(string); ok {
+						envVars[k] = s
+					}
+				}
+			}
+		}
+
+		logger.Info("executing code", "language", language, "packages", packages)
+
+		result, err := ex.RunCode(ctx, language, code, packages, envVars)
 		if err != nil {
 			logger.Error("execution failed", "error", err)
 			return mcp.NewToolResultError(fmt.Sprintf("Execution failed: %v", err)), nil
 		}
 
-		output := formatOutput(result)
-		return mcp.NewToolResultText(output), nil
-	}))
+		return mcp.NewToolResultText(formatOutput(result)), nil
+	})
 
 	logger.Info("starting MCP server", "name", cfg.Server.Name, "version", cfg.Server.Version)
 

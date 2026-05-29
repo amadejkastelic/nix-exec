@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
