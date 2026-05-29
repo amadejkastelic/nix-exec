@@ -1,18 +1,15 @@
 {
   buildGoModule,
 }:
-let
-  version = "0.1.0";
-in
-buildGoModule {
+buildGoModule (finalAttrs: {
   pname = "nix-exec";
-  inherit version;
+  version = "0.1.0";
   src = ./..;
   vendorHash = "sha256-TNGu96NH5DSdsHfjiPXT0twuOCsVlc4kpFULb+ebbLE=";
 
   ldflags = [
     "-s"
     "-w"
-    "-X main.version=${version}"
+    "-X main.version=${finalAttrs.version}"
   ];
-}
+})
