@@ -4,7 +4,6 @@
   system,
 }:
 let
-  nix-exec-pkg = self.packages.${system}.default;
   test-pkg = self.packages.${system}.test;
   nixpkgs-path = toString nixpkgs;
 in
@@ -43,7 +42,7 @@ in
     {
       imports = [ self.nixosModules.default ];
 
-      services.nix-exec = {
+      programs.nix-exec = {
         enable = true;
         settings = {
           server.name = "nix-exec-test";

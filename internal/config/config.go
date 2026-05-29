@@ -68,6 +68,10 @@ func Load(path string) (*Config, error) {
 	cfg := Default()
 
 	if path == "" {
+		path = findConfig()
+	}
+
+	if path == "" {
 		return cfg, nil
 	}
 
@@ -84,6 +88,33 @@ func Load(path string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func findConfig() string {
+	for _, p := range configPaths() {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+func configPaths() []string {
+	home, _ := os.UserHomeDir()
+	xdg := os.Getenv("XDG_CONFIG_HOME")
+	if xdg == "" && home != "" {
+		xdg = filepath.Join(home, ".config")
+	}
+
+	paths := []string{}
+	if xdg != "" {
+		paths = append(paths, filepath.Join(xdg, "nix-exec", "config.yaml"))
+	}
+	if home != "" {
+		paths = append(paths, filepath.Join(home, ".nix-exec.yaml"))
+	}
+	paths = append(paths, "/etc/nix-exec/config.yaml")
+	return paths
 }
 
 func (c *Config) LogLevel() slog.Level {

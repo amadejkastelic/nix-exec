@@ -5,11 +5,11 @@
   ...
 }:
 let
-  cfg = config.services.nix-exec;
+  cfg = config.programs.nix-exec;
   format = pkgs.formats.yaml { };
 in
 {
-  options.services.nix-exec = {
+  options.programs.nix-exec = {
     enable = lib.mkEnableOption "nix-exec MCP server";
 
     package = lib.mkOption {
@@ -140,7 +140,5 @@ in
     ];
 
     environment.etc."nix-exec/config.yaml".source = format.generate "nix-exec-config.yaml" cfg.settings;
-
-    environment.sessionVariables.NIX_EXEC_CONFIG = "/etc/nix-exec/config.yaml";
   };
 }
