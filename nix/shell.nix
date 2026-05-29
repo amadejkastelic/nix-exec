@@ -14,6 +14,6 @@ mkShell {
   ];
 
   shellHook = ''
-    echo "nix-exec dev shell ready"
+    go version
   '';
 }

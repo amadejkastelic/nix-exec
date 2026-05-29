@@ -24,10 +24,12 @@
         default = pkgs.callPackage ./nix/shell.nix { };
       });
 
+      nixosModules.default = import ./nix/module.nix;
+
       checks = forAllSystems (pkgs: {
         integration =
           (pkgs.testers.nixosTest or pkgs.nixosTest) (
-            import ./nix/tests/integration.nix {
+            import ./nix/tests/test.nix {
               inherit self nixpkgs;
               system = pkgs.stdenv.hostPlatform.system;
             }

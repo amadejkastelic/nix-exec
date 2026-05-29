@@ -15,35 +15,28 @@ in
   nodes.machine =
     { pkgs, ... }:
     {
-      environment.systemPackages = [
-        nix-exec-pkg
-        pkgs.bubblewrap
-      ];
+      imports = [ self.nixosModules.default ];
 
-      nix.enable = true;
-      nix.settings.experimental-features = [
-        "nix-command"
-        "flakes"
-      ];
+      services.nix-exec = {
+        enable = true;
+        package = nix-exec-pkg;
+        settings = {
+          server.name = "nix-exec-test";
+          server.version = "0.1.0-test";
+          sandbox.timeout = "5s";
+          executor = {
+            cache_dir = "/tmp/nix-exec-cache";
+            nixpkgs_url = "path:${nixpkgs-path}";
+          };
+          logging = {
+            level = "debug";
+            format = "text";
+          };
+        };
+      };
 
       virtualisation.memorySize = 4096;
       virtualisation.diskSize = 8192;
-
-      environment.etc."nix-exec/test-config.yaml".text = ''
-        server:
-          name: "nix-exec-test"
-          version: "0.1.0-test"
-        sandbox:
-          timeout: 5s
-          max_output_bytes: 1048576
-        executor:
-          cache_dir: /tmp/nix-exec-cache
-          temp_dir: /tmp
-          nixpkgs_url: "path:${nixpkgs-path}"
-        logging:
-          level: "debug"
-          format: "text"
-      '';
     };
 
   testScript = ''
@@ -53,7 +46,7 @@ in
     machine.succeed("which nix")
 
     machine.succeed(
-      "NIX_EXEC_TEST_CONFIG=/etc/nix-exec/test-config.yaml "
+      "NIX_EXEC_TEST_CONFIG=/etc/nix-exec/config.yaml "
       + "${test-pkg}/bin/nix-exec-integration-test -test.v -test.timeout 600s 2>&1"
     )
   '';
