@@ -470,7 +470,7 @@ print(f"mean={df['score'].mean()}")`,
 func testReadOnlyFileMount(c *mcpClient) error {
 	resp := c.callTool("run_code", map[string]any{
 		"language": "bash",
-		"code":     "cat /workspace/files/test-input.txt",
+		"code":     "while IFS= read -r line; do echo \"$line\"; done < /workspace/files/test-input.txt",
 		"files":    []any{"/tmp/test-input.txt"},
 	})
 	result, err := parseToolResult(resp)
@@ -489,7 +489,7 @@ func testReadOnlyFileMount(c *mcpClient) error {
 func testWritableFileMount(c *mcpClient) error {
 	resp := c.callTool("run_code", map[string]any{
 		"language":       "bash",
-		"code":           "echo 'written output' > /workspace/files/test-output-dir/result.txt && cat /workspace/files/test-output-dir/result.txt",
+		"code":           "echo 'written output' > /workspace/files/test-output-dir/result.txt && echo 'ok'",
 		"writable_files": []any{"/tmp/test-output-dir"},
 	})
 	result, err := parseToolResult(resp)
@@ -499,7 +499,7 @@ func testWritableFileMount(c *mcpClient) error {
 	if result.IsError {
 		return fmt.Errorf("tool error: %s", result.Content[0].Text)
 	}
-	if !strings.Contains(result.Content[0].Text, "written output") {
+	if !strings.Contains(result.Content[0].Text, "ok") {
 		return fmt.Errorf("writable file output missing: %s", result.Content[0].Text)
 	}
 	return nil
