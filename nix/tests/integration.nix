@@ -54,10 +54,9 @@ in
       import json
 
       machine.wait_for_unit("multi-user.target")
-      machine.wait_for_unit("nix-daemon.service")
-
       machine.succeed("which nix-exec")
       machine.succeed("which bwrap")
+      machine.succeed("which nix")
 
       with subtest("MCP initialize handshake"):
           result = machine.succeed(
