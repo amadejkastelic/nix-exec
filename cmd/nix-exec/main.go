@@ -99,7 +99,7 @@ func main() {
 		return mcp.NewToolResultText(formatOutput(result)), nil
 	})
 
-	logger.Info("starting MCP server", "name", cfg.Server.Name, "version", cfg.Server.Version)
+	logger.Info("starting MCP server", "name", cfg.Server.Name, "version", version)
 
 	if err := server.ServeStdio(s); err != nil {
 		logger.Error("server error", "error", err)
