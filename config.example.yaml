@@ -1,0 +1,33 @@
+# nix-exec MCP Server Configuration
+
+server:
+  name: "nix-exec"
+  version: "0.1.0"
+
+sandbox:
+  # Maximum execution time per run
+  timeout: 30s
+
+  # Maximum bytes captured from stdout/stderr
+  max_output_bytes: 1048576  # 1 MB
+
+  # Workspace path to expose read-only inside the sandbox
+  # Leave empty to disable workspace mounting
+  workspace_path: ""
+
+  # Packages that are never allowed
+  package_denylist: []
+
+executor:
+  # Directory for caching built Nix environments
+  cache_dir: "~/.cache/nix-exec"
+
+  # Base directory for temporary files
+  temp_dir: "/tmp"
+
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"
+
+  # Log format: json or text
+  format: "json"
