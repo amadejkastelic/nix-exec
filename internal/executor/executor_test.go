@@ -47,7 +47,13 @@ func TestWithInterpreterPackage(t *testing.T) {
 		}
 		for i := range got {
 			if got[i] != tt.want[i] {
-				t.Errorf("withInterpreterPackage(%q, %v) = %v, want %v", tt.lang, tt.pkgs, got, tt.want)
+				t.Errorf(
+					"withInterpreterPackage(%q, %v) = %v, want %v",
+					tt.lang,
+					tt.pkgs,
+					got,
+					tt.want,
+				)
 				break
 			}
 		}

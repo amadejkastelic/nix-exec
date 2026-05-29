@@ -70,11 +70,15 @@ func (e *Executor) RunCode(
 	if err != nil {
 		return nil, fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			e.logger.Error("failed removing tmp dir", "err", err.Error())
+		}
+	}()
 
 	ext := scriptExtension(lang)
 	scriptPath := filepath.Join(tmpDir, "script"+ext)
-	if err := os.WriteFile(scriptPath, []byte(code), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(code), 0o644); err != nil {
 		return nil, fmt.Errorf("write script: %w", err)
 	}
 
@@ -119,10 +123,18 @@ func (e *Executor) buildEnvironment(ctx context.Context, packages []string) (str
 	if err != nil {
 		return "", fmt.Errorf("create flake dir: %w", err)
 	}
-	defer os.RemoveAll(flakeDir)
+	defer func() {
+		if err := os.RemoveAll(flakeDir); err != nil {
+			e.logger.Error("failed removing flake dir", "err", err.Error())
+		}
+	}()
 
 	flakeContent := generateFlake(packages, e.config.Executor.NixpkgsURL)
-	if err := os.WriteFile(filepath.Join(flakeDir, "flake.nix"), []byte(flakeContent), 0644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(flakeDir, "flake.nix"),
+		[]byte(flakeContent),
+		0o644,
+	); err != nil {
 		return "", fmt.Errorf("write flake: %w", err)
 	}
 
@@ -156,7 +168,7 @@ func generateFlake(packages []string, nixpkgsURL string) string {
 
 	var pathsBuilder strings.Builder
 	for _, pkg := range packages {
-		pathsBuilder.WriteString(fmt.Sprintf("      pkgs.%s\n", pkg))
+		fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
 	}
 
 	return fmt.Sprintf(`{

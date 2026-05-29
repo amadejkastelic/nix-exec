@@ -65,7 +65,7 @@ func (c *EnvCache) load() {
 }
 
 func (c *EnvCache) persist() {
-	if err := os.MkdirAll(c.dir, 0755); err != nil {
+	if err := os.MkdirAll(c.dir, 0o755); err != nil {
 		c.logger.Warn("failed to create cache directory", "error", err)
 		return
 	}
@@ -76,7 +76,7 @@ func (c *EnvCache) persist() {
 		return
 	}
 
-	if err := os.WriteFile(c.filePath(), data, 0644); err != nil {
+	if err := os.WriteFile(c.filePath(), data, 0o644); err != nil {
 		c.logger.Warn("failed to write cache file", "error", err)
 	}
 }

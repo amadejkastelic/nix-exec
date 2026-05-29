@@ -58,7 +58,7 @@ logging:
   level: "debug"
   format: "text"
 `
-	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 

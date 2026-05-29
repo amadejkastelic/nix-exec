@@ -1,0 +1,29 @@
+version: "2"
+
+linters:
+  enable:
+    - govet
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+    - golines
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/amadejkastelic/nix-exec
+
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - unsafeptr
+
+issues:
+  exclude-rules:
+    - linters:
+        - govet
+      text: "possible misuse of unsafe.Pointer"

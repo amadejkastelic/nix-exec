@@ -1,10 +1,10 @@
 package sandbox
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
-	"log/slog"
 )
 
 func TestBuildBwrapArgs(t *testing.T) {
@@ -67,7 +67,8 @@ func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 
 	found := false
 	for i := 0; i < len(args)-2; i++ {
-		if args[i] == "--ro-bind" && args[i+1] == "/home/user/project" && args[i+2] == "/workspace" {
+		if args[i] == "--ro-bind" && args[i+1] == "/home/user/project" &&
+			args[i+2] == "/workspace" {
 			found = true
 			break
 		}
