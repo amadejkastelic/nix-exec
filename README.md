@@ -1,6 +1,6 @@
 # nix-exec
 
-An MCP server for secure, sandboxed code execution using [Nix Flakes](https://nix.dev/concepts/flakes) for dependency management and [Bubblewrap](https://github.com/containers/bubblewrap) for isolation.
+An MCP server for secure, sandboxed code execution using [Nix Flakes](https://nix.dev/concepts/flakes) for dependency management and OS-native sandboxing for isolation.
 
 Designed for AI agents that need to run arbitrary code safely - each execution gets a fresh, minimal sandbox with only the declared dependencies available.
 
@@ -8,9 +8,10 @@ Designed for AI agents that need to run arbitrary code safely - each execution g
 
 - **`run_code` tool** - execute Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, or Octave code from any MCP client
 - **Reproducible environments** - Nix flake-based dependency resolution with built-in caching
-- **Sandboxed execution** - Bubblewrap isolates every run (separate PID/IPC/net mount namespaces, read-only nix store)
+- **Sandboxed execution** - Bubblewrap on Linux (namespace isolation), Seatbelt on macOS (policy-based sandboxing via `sandbox-exec`)
+- **Auto workspace mount** - project directory detected via MCP Roots and mounted read-write inside the sandbox
 - **Configurable** - YAML config file, environment variables, and CLI flags with sensible defaults
-- **NixOS module** - declarative deployment via `programs.nix-exec`
+- **NixOS module** - declarative deployment via `programs.nix-exec` (Linux only)
 
 ## Usage
 
@@ -46,8 +47,10 @@ A config file is optional - sensible defaults are used if none is found. Configu
 | `code`           | string   | yes      | Source code to execute                                                   |
 | `packages`       | string[] | no       | Nix packages to include (e.g. `"ripgrep"`, `"python3Packages.pandas"`)  |
 | `env`            | object   | no       | Environment variables to set in the sandbox                              |
-| `files`          | string[] | no       | Host paths to mount read-only under `/workspace/files/`                  |
-| `writable_files` | string[] | no       | Host paths to mount read-write under `/workspace/files/`                 |
+| `files`          | string[] | no       | Host paths to mount read-only inside the sandbox                         |
+| `writable_files` | string[] | no       | Host paths to mount read-write inside the sandbox                        |
+
+The project directory is automatically detected via MCP Roots and mounted read-write inside the sandbox. On Linux it appears at `/workspace`; on macOS it is accessible at its real path.
 
 Example - Python with pandas:
 
@@ -58,18 +61,6 @@ Example - Python with pandas:
   "packages": ["python3Packages.pandas"]
 }
 ```
-
-Example - read a host file:
-
-```json
-{
-  "language": "bash",
-  "code": "cat /workspace/files/data.csv | head -5",
-  "files": ["/home/user/data.csv"]
-}
-```
-
-### Configuration
 
 ### Supported Languages
 
@@ -198,21 +189,23 @@ go build -o nix-exec ./cmd/nix-exec
 go test ./...
 ```
 
-> **Note:** Bubblewrap and Nix (with flakes) must be available on the host at runtime.
+> **Note:** On Linux, [Bubblewrap](https://github.com/containers/bubblewrap) and Nix (with flakes) must be available at runtime. On macOS, `sandbox-exec` is built-in and Nix (with flakes) must be installed.
 
 ## How it works
 
 1. The executor resolves the language to an interpreter and generates a Nix flake that builds a `buildEnv` with the requested packages.
 2. For languages with package sets (Python, Haskell, Lua, Ruby, Perl, Octave), packages matching the set prefix (e.g. `python3Packages.*`, `haskellPackages.*`) are grouped and installed via `{interpreter}.withPackages` so dependencies are properly wired (e.g. into `site-packages`, GHC's package db, Lua's `LUA_PATH`, etc.).
 3. The flake is built with `nix build`, and the resulting store path is cached (keyed by language + sorted package list).
-4. The sandbox spawns Bubblewrap with the built environment mounted at `/env`, the script in `/tmp`, and full namespace isolation.
+4. The sandbox is launched with the built environment:
+   - **Linux** - [Bubblewrap](https://github.com/containers/bubblewrap) creates isolated PID/IPC/network/mount namespaces. The environment is mounted at `/env`, the workspace at `/workspace`, and all capabilities are dropped.
+   - **macOS** - [Seatbelt](https://developer.apple.com/library/archive/documentation/Security/Conceptual/AppSandboxDesignGuide/AppSandboxInDepth/AppSandboxInDepth.html) (`sandbox-exec`) enforces a deny-by-default policy allowing only reads from system paths and the Nix store, read-write to the workspace and temp directory, and no network access. The environment is accessed at its real Nix store path.
 5. Output is captured, truncated to `max_output_bytes`, and returned as MCP tool result text.
 
 ## Requirements
 
-- Linux (sandboxing uses Bubblewrap)
+- Linux or macOS
 - Nix with flakes enabled
-- [Bubblewrap](https://github.com/containers/bubblewrap)
+- [Bubblewrap](https://github.com/containers/bubblewrap) (Linux only; `sandbox-exec` is built into macOS)
 
 ## License
 

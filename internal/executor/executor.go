@@ -91,12 +91,26 @@ func (e *Executor) RunCode(
 		return nil, fmt.Errorf("write script: %w", err)
 	}
 
-	command := []string{"/env/bin/" + interpreter, "/tmp/script" + ext}
+	var command []string
+	var sandboxEnv []string
 
-	sandboxEnv := []string{
-		"PATH=/env/bin:/usr/bin:/bin",
-		"HOME=/tmp",
-		"TERM=dumb",
+	if runtime.GOOS == "darwin" {
+		command = []string{
+			filepath.Join(envPath, "bin", interpreter),
+			filepath.Join(tmpDir, "script"+ext),
+		}
+		sandboxEnv = []string{
+			fmt.Sprintf("PATH=%s/bin:/usr/bin:/bin", envPath),
+			fmt.Sprintf("HOME=%s", tmpDir),
+			"TERM=dumb",
+		}
+	} else {
+		command = []string{"/env/bin/" + interpreter, "/tmp/script" + ext}
+		sandboxEnv = []string{
+			"PATH=/env/bin:/usr/bin:/bin",
+			"HOME=/tmp",
+			"TERM=dumb",
+		}
 	}
 	for k, v := range envVars {
 		sandboxEnv = append(sandboxEnv, fmt.Sprintf("%s=%s", k, v))

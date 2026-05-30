@@ -7,41 +7,16 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
-	"unicode/utf8"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
 )
 
-type FileMount struct {
-	HostPath string
-	Writable bool
-}
-
-type Sandbox struct {
+type BwrapBackend struct {
 	config *config.Config
 	logger *slog.Logger
 }
 
-type RunResult struct {
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	ExitCode int    `json:"exit_code"`
-	TimedOut bool   `json:"timed_out"`
-}
-
-func New(cfg *config.Config, logger *slog.Logger) *Sandbox {
-	return &Sandbox{
-		config: cfg,
-		logger: logger,
-	}
-}
-
-type WorkspaceMount struct {
-	Path     string
-	Writable bool
-}
-
-func (s *Sandbox) Run(
+func (b *BwrapBackend) Run(
 	ctx context.Context,
 	command []string,
 	envPath string,
@@ -50,9 +25,9 @@ func (s *Sandbox) Run(
 	fileMounts []FileMount,
 	workspace *WorkspaceMount,
 ) (*RunResult, error) {
-	args := s.buildBwrapArgs(command, envPath, tmpDir, fileMounts, workspace)
+	args := b.buildBwrapArgs(command, envPath, tmpDir, fileMounts, workspace)
 
-	s.logger.Debug("running sandboxed command",
+	b.logger.Debug("running sandboxed command",
 		"args", args,
 		"env_vars", envVars,
 	)
@@ -67,8 +42,8 @@ func (s *Sandbox) Run(
 	err := cmd.Run()
 
 	result := &RunResult{
-		Stdout:   truncate(stdout.String(), s.config.Sandbox.MaxOutputBytes),
-		Stderr:   truncate(stderr.String(), s.config.Sandbox.MaxOutputBytes),
+		Stdout:   truncate(stdout.String(), b.config.Sandbox.MaxOutputBytes),
+		Stderr:   truncate(stderr.String(), b.config.Sandbox.MaxOutputBytes),
 		ExitCode: 0,
 		TimedOut: false,
 	}
@@ -88,7 +63,7 @@ func (s *Sandbox) Run(
 	return result, nil
 }
 
-func (s *Sandbox) buildBwrapArgs(
+func (b *BwrapBackend) buildBwrapArgs(
 	command []string,
 	envPath string,
 	tmpDir string,
@@ -129,15 +104,4 @@ func (s *Sandbox) buildBwrapArgs(
 	args = append(args, command...)
 
 	return args
-}
-
-func truncate(s string, maxBytes int64) string {
-	if int64(len(s)) <= maxBytes {
-		return s
-	}
-	for int64(len(s)) > maxBytes {
-		_, size := utf8.DecodeLastRuneInString(s)
-		s = s[:len(s)-size]
-	}
-	return s + "\n[OUTPUT TRUNCATED]"
 }
