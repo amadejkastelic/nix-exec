@@ -55,12 +55,12 @@ func main() {
 	runCodeTool := mcp.NewTool(
 		"run_code",
 		mcp.WithDescription(
-			"Execute code in a secure, sandboxed Nix environment. Supports Python, Bash, and Node.js. Specify packages for dependencies.",
+			"Execute code in a secure, sandboxed Nix environment. Supports Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, and Octave. Specify packages for dependencies.",
 		),
 		mcp.WithString("language",
 			mcp.Required(),
 			mcp.Description("Programming language to execute"),
-			mcp.Enum("python", "bash", "node"),
+			mcp.Enum("python", "bash", "node", "haskell", "lua", "ruby", "perl", "octave"),
 		),
 		mcp.WithString("code",
 			mcp.Required(),

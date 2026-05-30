@@ -95,10 +95,13 @@ func TestScriptExtension(t *testing.T) {
 }
 
 func TestCacheKey(t *testing.T) {
-	key1 := cacheKey("python", []string{"bash", "python3"})
-	key2 := cacheKey("python", []string{"bash", "python3"})
-	key3 := cacheKey("python", []string{"bash"})
-	key4 := cacheKey("bash", []string{"bash", "python3"})
+	url := "github:NixOS/nixpkgs/nixpkgs-unstable"
+
+	key1 := cacheKey("python", []string{"bash", "python3"}, url)
+	key2 := cacheKey("python", []string{"bash", "python3"}, url)
+	key3 := cacheKey("python", []string{"bash"}, url)
+	key4 := cacheKey("bash", []string{"bash", "python3"}, url)
+	key5 := cacheKey("python", []string{"bash", "python3"}, "github:user/other")
 
 	if key1 != key2 {
 		t.Error("cacheKey should be deterministic for same input")
@@ -110,6 +113,10 @@ func TestCacheKey(t *testing.T) {
 
 	if key1 == key4 {
 		t.Error("cacheKey should differ for different languages")
+	}
+
+	if key1 == key5 {
+		t.Error("cacheKey should differ for different nixpkgs URLs")
 	}
 
 	if len(key1) != 64 {

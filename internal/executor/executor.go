@@ -129,7 +129,7 @@ func (e *Executor) buildEnvironment(
 	}
 
 	sort.Strings(packages)
-	key := cacheKey(lang, packages)
+	key := cacheKey(lang, packages, e.config.Executor.NixpkgsURL)
 
 	if cached, ok := e.cache.Get(key); ok {
 		e.logger.Debug("using cached environment", "key", key, "path", cached)
@@ -330,9 +330,9 @@ func validPackageName(pkg string) bool {
 	return packageNameRe.MatchString(pkg)
 }
 
-func cacheKey(lang string, packages []string) string {
+func cacheKey(lang string, packages []string, nixpkgsURL string) string {
 	h := sha256.New()
-	h.Write([]byte(lang + ":" + strings.Join(packages, ",")))
+	h.Write([]byte(lang + ":" + nixpkgsURL + ":" + strings.Join(packages, ",")))
 	return hex.EncodeToString(h.Sum(nil))
 }
 

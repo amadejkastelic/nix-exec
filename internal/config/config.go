@@ -89,6 +89,11 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
+	home, _ := os.UserHomeDir()
+	cfg.Executor.CacheDir = expandHome(cfg.Executor.CacheDir, home)
+	cfg.Executor.TempDir = expandHome(cfg.Executor.TempDir, home)
+	cfg.Sandbox.WorkspacePath = expandHome(cfg.Sandbox.WorkspacePath, home)
+
 	return cfg, nil
 }
 
@@ -238,4 +243,17 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+func expandHome(path, home string) string {
+	if path == "" || home == "" {
+		return path
+	}
+	if path == "~" {
+		return home
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }

@@ -255,3 +255,55 @@ func TestSplitCSV(t *testing.T) {
 		}
 	}
 }
+
+func TestExpandHome(t *testing.T) {
+	home := "/home/user"
+	tests := []struct {
+		input, want string
+	}{
+		{"~", "/home/user"},
+		{"~/foo/bar", "/home/user/foo/bar"},
+		{"/absolute/path", "/absolute/path"},
+		{"", ""},
+		{"~otheruser", "~otheruser"},
+	}
+
+	for _, tt := range tests {
+		got := expandHome(tt.input, home)
+		if got != tt.want {
+			t.Errorf("expandHome(%q, %q) = %q, want %q", tt.input, home, got, tt.want)
+		}
+	}
+}
+
+func TestLoadFromFileExpandsHome(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	content := `
+executor:
+  cache_dir: "~/custom-cache"
+  temp_dir: "~/custom-tmp"
+sandbox:
+  workspace_path: "~/my-workspace"
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	home, _ := os.UserHomeDir()
+	if cfg.Executor.CacheDir != filepath.Join(home, "custom-cache") {
+		t.Errorf("cache_dir not expanded, got %s", cfg.Executor.CacheDir)
+	}
+	if cfg.Executor.TempDir != filepath.Join(home, "custom-tmp") {
+		t.Errorf("temp_dir not expanded, got %s", cfg.Executor.TempDir)
+	}
+	if cfg.Sandbox.WorkspacePath != filepath.Join(home, "my-workspace") {
+		t.Errorf("workspace_path not expanded, got %s", cfg.Sandbox.WorkspacePath)
+	}
+}

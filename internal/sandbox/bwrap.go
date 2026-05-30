@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
 )
@@ -123,5 +124,9 @@ func truncate(s string, maxBytes int64) string {
 	if int64(len(s)) <= maxBytes {
 		return s
 	}
-	return s[:maxBytes] + "\n[OUTPUT TRUNCATED]"
+	for int64(len(s)) > maxBytes {
+		_, size := utf8.DecodeLastRuneInString(s)
+		s = s[:len(s)-size]
+	}
+	return s + "\n[OUTPUT TRUNCATED]"
 }

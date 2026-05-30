@@ -27,20 +27,29 @@ func NewEnvCache(dir string, logger *slog.Logger) *EnvCache {
 
 func (c *EnvCache) Get(key string) (string, bool) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	p, ok := c.items[key]
+	c.mu.RUnlock()
+
 	if !ok {
 		return "", false
 	}
 
 	if _, err := os.Stat(p); err != nil {
-		c.logger.Debug("cached path no longer exists, evicting", "key", key, "path", p)
-		delete(c.items, key)
+		c.evict(key, p)
 		return "", false
 	}
 
 	return p, true
+}
+
+func (c *EnvCache) evict(key, path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if cur, ok := c.items[key]; ok && cur == path {
+		delete(c.items, key)
+		c.persist()
+	}
 }
 
 func (c *EnvCache) Set(key, path string) {
