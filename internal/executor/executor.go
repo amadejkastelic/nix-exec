@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"sort"
@@ -54,6 +55,9 @@ func (e *Executor) RunCode(
 	}
 
 	for _, pkg := range packages {
+		if !validPackageName(pkg) {
+			return nil, fmt.Errorf("invalid package name %q", pkg)
+		}
 		for _, denied := range e.config.Sandbox.PackageDenylist {
 			if pkg == denied {
 				return nil, fmt.Errorf("package %q is not allowed", pkg)
@@ -318,6 +322,12 @@ func nixSystem() string {
 	default:
 		return "x86_64-linux"
 	}
+}
+
+var packageNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
+func validPackageName(pkg string) bool {
+	return packageNameRe.MatchString(pkg)
 }
 
 func cacheKey(lang string, packages []string) string {

