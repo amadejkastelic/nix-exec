@@ -135,6 +135,22 @@ in
       default = { };
       description = "nix-exec configuration (config.yaml).";
     };
+
+    service = {
+      enable = lib.mkEnableOption "nix-exec systemd service";
+
+      user = lib.mkOption {
+        type = lib.types.str;
+        default = "nix-exec";
+        description = "User to run the nix-exec service as.";
+      };
+
+      group = lib.mkOption {
+        type = lib.types.str;
+        default = "nix-exec";
+        description = "Group to run the nix-exec service as.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -150,5 +166,38 @@ in
     ];
 
     environment.etc."nix-exec/config.yaml".source = format.generate "nix-exec-config.yaml" cfg.settings;
+
+    users.users.${cfg.service.user} = lib.mkIf cfg.service.enable {
+      isSystemUser = true;
+      group = cfg.service.group;
+      home = "/var/lib/nix-exec";
+      createHome = true;
+    };
+
+    users.groups.${cfg.service.group} = lib.mkIf cfg.service.enable { };
+
+    systemd.services.nix-exec = lib.mkIf cfg.service.enable {
+      description = "nix-exec MCP server";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
+
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = "${cfg.package}/bin/nix-exec --config /etc/nix-exec/config.yaml";
+        User = cfg.service.user;
+        Group = cfg.service.group;
+        Restart = "on-failure";
+        RestartSec = "5s";
+
+        ProtectSystem = "strict";
+        ProtectHome = "read-only";
+        PrivateTmp = true;
+        NoNewPrivileges = true;
+        ReadWritePaths = [
+          "/var/lib/nix-exec"
+          "/nix/var/nix"
+        ];
+      };
+    };
   };
 }
