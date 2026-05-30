@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -154,9 +156,29 @@ func main() {
 
 	logger.Info("starting MCP server", "name", cfg.Server.Name, "version", version)
 
-	if err := server.ServeStdio(s); err != nil {
-		logger.Error("server error", "error", err)
-		os.Exit(1)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+
+	stdio := server.NewStdioServer(s)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- stdio.Listen(ctx, os.Stdin, os.Stdout)
+	}()
+
+	select {
+	case <-ctx.Done():
+		logger.Info("received shutdown signal, waiting for in-flight requests to finish")
+		if err := <-errCh; err != nil {
+			logger.Error("server error during shutdown", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("server stopped")
+	case err := <-errCh:
+		if err != nil {
+			logger.Error("server error", "error", err)
+			os.Exit(1)
+		}
 	}
 }
 
