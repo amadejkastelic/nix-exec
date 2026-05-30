@@ -1,5 +1,6 @@
 {
   buildGoModule,
+  lib,
 }:
 buildGoModule (finalAttrs: {
   pname = "nix-exec";
@@ -13,5 +14,12 @@ buildGoModule (finalAttrs: {
     "-X main.version=${finalAttrs.version}"
   ];
 
-  meta.mainProgram = "nix-exec";
+  meta = {
+    description = "MCP server for secure, sandboxed code execution with Nix";
+    homepage = "https://github.com/amadejkastelic/nix-exec";
+    license = lib.licenses.mit;
+    maintainers = [ lib.maintainers.amadejkastelic ];
+    mainProgram = "nix-exec";
+    platforms = lib.platforms.linux;
+  };
 })
