@@ -157,7 +157,10 @@ func (e *Executor) buildEnvironment(
 		e.inflight.Delete(key)
 	}()
 
-	val, err := e.nixBuild(ctx, lang, packages)
+	buildCtx, buildCancel := context.WithTimeout(ctx, e.config.Executor.BuildTimeout)
+	defer buildCancel()
+
+	val, err := e.nixBuild(buildCtx, lang, packages)
 	if err == nil {
 		e.cache.Set(key, val)
 	}

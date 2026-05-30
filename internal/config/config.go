@@ -30,11 +30,12 @@ type SandboxConfig struct {
 }
 
 type ExecutorConfig struct {
-	CacheDir     string   `yaml:"cache_dir"`
-	CacheMaxSize int      `yaml:"cache_max_size"`
-	TempDir      string   `yaml:"temp_dir"`
-	NixpkgsURL   string   `yaml:"nixpkgs_url"`
-	Substituters []string `yaml:"substituters"`
+	CacheDir     string        `yaml:"cache_dir"`
+	CacheMaxSize int           `yaml:"cache_max_size"`
+	BuildTimeout time.Duration `yaml:"build_timeout"`
+	TempDir      string        `yaml:"temp_dir"`
+	NixpkgsURL   string        `yaml:"nixpkgs_url"`
+	Substituters []string      `yaml:"substituters"`
 }
 
 type LoggingConfig struct {
@@ -58,6 +59,7 @@ func Default() *Config {
 		Executor: ExecutorConfig{
 			CacheDir:     filepath.Join(home, ".cache", "nix-exec"),
 			CacheMaxSize: 64,
+			BuildTimeout: 5 * time.Minute,
 			TempDir:      os.TempDir(),
 			NixpkgsURL:   "github:NixOS/nixpkgs/nixpkgs-unstable",
 		},
@@ -147,6 +149,7 @@ type flagPtrs struct {
 	packageDenylist *string
 	cacheDir        *string
 	cacheMaxSize    *int
+	buildTimeout    *time.Duration
 	tempDir         *string
 	nixpkgsURL      *string
 	substituters    *string
@@ -186,6 +189,11 @@ func (c *Config) RegisterFlags(fs *flag.FlagSet) *flagPtrs {
 			"cache-max-size",
 			c.Executor.CacheMaxSize,
 			"Maximum number of cached environments (0 = unlimited)",
+		),
+		buildTimeout: fs.Duration(
+			"build-timeout",
+			c.Executor.BuildTimeout,
+			"Maximum time for nix environment builds (e.g. 5m)",
 		),
 		tempDir: fs.String(
 			"temp-dir",
@@ -227,6 +235,8 @@ func (c *Config) ApplyFlags(fs *flag.FlagSet, fp *flagPtrs) {
 			c.Executor.CacheDir = *fp.cacheDir
 		case "cache-max-size":
 			c.Executor.CacheMaxSize = *fp.cacheMaxSize
+		case "build-timeout":
+			c.Executor.BuildTimeout = *fp.buildTimeout
 		case "temp-dir":
 			c.Executor.TempDir = *fp.tempDir
 		case "nixpkgs-url":

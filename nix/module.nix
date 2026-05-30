@@ -80,6 +80,11 @@ in
                 default = 64;
                 description = "Maximum number of cached environments.";
               };
+              build_timeout = lib.mkOption {
+                type = lib.types.str;
+                default = "5m";
+                description = "Maximum time for nix environment builds.";
+              };
               temp_dir = lib.mkOption {
                 type = lib.types.str;
                 default = "/tmp";
