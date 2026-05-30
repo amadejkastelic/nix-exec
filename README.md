@@ -2,15 +2,15 @@
 
 An MCP server for secure, sandboxed code execution using [Nix Flakes](https://nix.dev/concepts/flakes) for dependency management and [Bubblewrap](https://github.com/containers/bubblewrap) for isolation.
 
-Designed for AI agents that need to run arbitrary code safely — each execution gets a fresh, minimal sandbox with only the declared dependencies available.
+Designed for AI agents that need to run arbitrary code safely - each execution gets a fresh, minimal sandbox with only the declared dependencies available.
 
 ## Features
 
-- **`run_code` tool** — execute Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, or Octave code from any MCP client
-- **Reproducible environments** — Nix flake-based dependency resolution with built-in caching
-- **Sandboxed execution** — Bubblewrap isolates every run (separate PID/IPC/net mount namespaces, read-only nix store)
-- **Configurable** — YAML config file, environment variables, and CLI flags with sensible defaults
-- **NixOS module** — declarative deployment via `programs.nix-exec`
+- **`run_code` tool** - execute Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, or Octave code from any MCP client
+- **Reproducible environments** - Nix flake-based dependency resolution with built-in caching
+- **Sandboxed execution** - Bubblewrap isolates every run (separate PID/IPC/net mount namespaces, read-only nix store)
+- **Configurable** - YAML config file, environment variables, and CLI flags with sensible defaults
+- **NixOS module** - declarative deployment via `programs.nix-exec`
 
 ## Usage
 
@@ -29,14 +29,14 @@ Configure your MCP client (e.g. Claude Desktop, opencode) to run:
 }
 ```
 
-A config file is optional — sensible defaults are used if none is found. Configuration is loaded in this order (later sources override earlier ones):
+A config file is optional - sensible defaults are used if none is found. Configuration is loaded in this order (later sources override earlier ones):
 
 1. **Built-in defaults**
-2. **Config file** — set via `-config` flag or `NIX_EXEC_CONFIG` env var. When neither is set, the following locations are searched:
+2. **Config file** - set via `-config` flag or `NIX_EXEC_CONFIG` env var. When neither is set, the following locations are searched:
    - `$XDG_CONFIG_HOME/nix-exec/config.yaml`
    - `~/.nix-exec.yaml`
    - `/etc/nix-exec/config.yaml`
-3. **CLI flags** — override all other sources
+3. **CLI flags** - override all other sources
 
 ### The `run_code` tool
 
@@ -49,7 +49,7 @@ A config file is optional — sensible defaults are used if none is found. Confi
 | `files`          | string[] | no       | Host paths to mount read-only under `/workspace/files/`                  |
 | `writable_files` | string[] | no       | Host paths to mount read-write under `/workspace/files/`                 |
 
-Example — Python with pandas:
+Example - Python with pandas:
 
 ```json
 {
@@ -59,7 +59,7 @@ Example — Python with pandas:
 }
 ```
 
-Example — read a host file:
+Example - read a host file:
 
 ```json
 {

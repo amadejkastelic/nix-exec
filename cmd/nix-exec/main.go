@@ -56,36 +56,45 @@ func main() {
 	runCodeTool := mcp.NewTool(
 		"run_code",
 		mcp.WithDescription(
-			"Execute code in a secure, sandboxed Nix environment. Supports Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, and Octave. Specify packages for dependencies.",
+			"Execute code or commands in a secure, sandboxed Nix environment. Use this tool for ALL code execution and shell commands — including bash scripts, one-liners, running system commands, and executing code in any supported language. Each execution runs in an isolated sandbox with namespace-level isolation (PID, IPC, network, mount) and a read-only Nix store. Supports Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, and Octave. Declare Nix packages for any dependencies you need (e.g. 'ripgrep', 'python3Packages.pandas', 'nodejs'). Environments are cached, so repeated runs with the same packages are fast. The current working directory is mounted read-only at /workspace. Use 'files' or 'writable_files' to mount additional host paths under /workspace/files/.",
 		),
-		mcp.WithString("language",
+		mcp.WithString(
+			"language",
 			mcp.Required(),
-			mcp.Description("Programming language to execute"),
+			mcp.Description(
+				"Language/runtime to use: python, bash, node, haskell, lua, ruby, perl, or octave. Use 'bash' for shell commands, system utilities, and scripting.",
+			),
 			mcp.Enum("python", "bash", "node", "haskell", "lua", "ruby", "perl", "octave"),
 		),
-		mcp.WithString("code",
+		mcp.WithString(
+			"code",
 			mcp.Required(),
-			mcp.Description("Source code to execute"),
+			mcp.Description(
+				"Source code or shell commands to execute. For bash, this can be a single command, a pipeline, or a multi-line script.",
+			),
 		),
 		mcp.WithArray(
 			"packages",
 			mcp.Description(
-				"Nix packages to include in the environment (e.g. 'ripgrep', 'python3Packages.pandas')",
+				"Nix packages to include in the sandbox environment. Examples: 'ripgrep' for rg, 'python3Packages.pandas' for Python libraries, 'nodejs' for Node.js. Package sets: python3Packages, haskellPackages, lua5_4Packages, rubyPackages, perlPackages, octavePackages.",
 			),
 			mcp.Items(map[string]any{"type": "string"}),
 		),
-		mcp.WithObject("env",
-			mcp.Description("Environment variables to set in the sandbox"),
+		mcp.WithObject(
+			"env",
+			mcp.Description(
+				"Environment variables to set inside the sandbox (key-value pairs, values must be strings).",
+			),
 		),
 		mcp.WithArray("files",
 			mcp.Description(
-				"Host paths to mount read-only in the sandbox under /workspace/files/",
+				"Absolute host paths to mount read-only inside the sandbox under /workspace/files/. Use this to give the sandbox access to specific files or directories.",
 			),
 			mcp.Items(map[string]any{"type": "string"}),
 		),
 		mcp.WithArray("writable_files",
 			mcp.Description(
-				"Host paths to mount read-write in the sandbox under /workspace/files/",
+				"Absolute host paths to mount read-write inside the sandbox under /workspace/files/. Use this when the code needs to modify or create files on the host.",
 			),
 			mcp.Items(map[string]any{"type": "string"}),
 		),
@@ -158,7 +167,7 @@ func main() {
 	listLangsTool := mcp.NewTool(
 		"list_languages",
 		mcp.WithDescription(
-			"List supported programming languages, their interpreters, and package set prefixes.",
+			"List all supported programming languages with their interpreter commands and Nix package set prefixes. Use this to discover available languages and how to reference their packages in the 'packages' parameter of run_code.",
 		),
 	)
 
