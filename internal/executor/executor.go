@@ -14,16 +14,18 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
 	"github.com/amadejkastelic/nix-exec/internal/sandbox"
 )
 
 type Executor struct {
-	config  *config.Config
-	sandbox *sandbox.Sandbox
-	cache   *EnvCache
-	logger  *slog.Logger
+	config   *config.Config
+	sandbox  *sandbox.Sandbox
+	cache    *EnvCache
+	logger   *slog.Logger
+	inflight sync.Map
 }
 
 type ExecutionResult struct {
@@ -119,6 +121,12 @@ func (e *Executor) RunCode(
 	}, nil
 }
 
+type call struct {
+	wg  sync.WaitGroup
+	val string
+	err error
+}
+
 func (e *Executor) buildEnvironment(
 	ctx context.Context,
 	lang string,
@@ -136,6 +144,33 @@ func (e *Executor) buildEnvironment(
 		return cached, nil
 	}
 
+	c, loaded := e.inflight.LoadOrStore(key, &call{})
+	ac := c.(*call)
+	if loaded {
+		e.logger.Debug("waiting for in-flight build", "key", key)
+		ac.wg.Wait()
+		return ac.val, ac.err
+	}
+	ac.wg.Add(1)
+	defer func() {
+		ac.wg.Done()
+		e.inflight.Delete(key)
+	}()
+
+	val, err := e.nixBuild(ctx, lang, packages)
+	if err == nil {
+		e.cache.Set(key, val)
+	}
+	ac.val = val
+	ac.err = err
+	return val, err
+}
+
+func (e *Executor) nixBuild(
+	ctx context.Context,
+	lang string,
+	packages []string,
+) (string, error) {
 	flakeDir, err := os.MkdirTemp(e.config.Executor.TempDir, "nix-exec-flake-*")
 	if err != nil {
 		return "", fmt.Errorf("create flake dir: %w", err)
@@ -178,8 +213,6 @@ func (e *Executor) buildEnvironment(
 
 	storePath := strings.TrimSpace(string(output))
 	e.logger.Info("environment built", "path", storePath)
-
-	e.cache.Set(key, storePath)
 
 	return storePath, nil
 }
