@@ -50,6 +50,7 @@ func (e *Executor) RunCode(
 	packages []string,
 	envVars map[string]string,
 	fileMounts []sandbox.FileMount,
+	workspace *sandbox.WorkspaceMount,
 ) (*ExecutionResult, error) {
 	interpreter, err := resolveInterpreter(lang)
 	if err != nil {
@@ -108,6 +109,7 @@ func (e *Executor) RunCode(
 		tmpDir,
 		sandboxEnv,
 		fileMounts,
+		workspace,
 	)
 	if err != nil {
 		return nil, err

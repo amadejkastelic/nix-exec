@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -42,6 +43,7 @@ func main() {
 
 	cfg.ApplyFlags(flag.CommandLine, fp)
 
+	cwd, _ := os.Getwd()
 	logger := setupLogger(cfg)
 
 	sb := sandbox.New(cfg, logger)
@@ -51,12 +53,13 @@ func main() {
 		cfg.Server.Name,
 		version,
 		server.WithToolCapabilities(false),
+		server.WithRoots(),
 	)
 
 	runCodeTool := mcp.NewTool(
 		"run_code",
 		mcp.WithDescription(
-			"Execute code or commands in a secure, sandboxed Nix environment. Use this tool for ALL code execution and shell commands — including bash scripts, one-liners, running system commands, and executing code in any supported language. Each execution runs in an isolated sandbox with namespace-level isolation (PID, IPC, network, mount) and a read-only Nix store. Supports Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, and Octave. Declare Nix packages for any dependencies you need (e.g. 'ripgrep', 'python3Packages.pandas', 'nodejs'). Environments are cached, so repeated runs with the same packages are fast. The current working directory is mounted read-only at /workspace. Use 'files' or 'writable_files' to mount additional host paths under /workspace/files/.",
+			"Execute code or commands in a secure, sandboxed Nix environment. Use this tool for ALL code execution and shell commands — including bash scripts, one-liners, running system commands, and executing code in any supported language. Each execution runs in an isolated sandbox with namespace-level isolation (PID, IPC, network, mount) and a read-only Nix store. Supports Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, and Octave. Declare Nix packages for any dependencies you need (e.g. 'ripgrep', 'python3Packages.pandas', 'nodejs'). Environments are cached, so repeated runs with the same packages are fast. The current working directory is automatically mounted read-write at /workspace (detected via MCP roots, with cwd as fallback). Use 'files' or 'writable_files' to mount additional host paths under /workspace/files/.",
 		),
 		mcp.WithString(
 			"language",
@@ -142,6 +145,16 @@ func main() {
 				)
 			}
 
+			var workspace *sandbox.WorkspaceMount
+			if cfg.Sandbox.WorkspacePath != "" {
+				workspace = &sandbox.WorkspaceMount{
+					Path:     cfg.Sandbox.WorkspacePath,
+					Writable: false,
+				}
+			} else {
+				workspace = resolveWorkspace(ctx, s, cwd, logger)
+			}
+
 			logger.Info("executing code", "language", language, "packages", packages)
 
 			ctx, cancel := context.WithTimeout(ctx, cfg.Sandbox.Timeout)
@@ -154,6 +167,7 @@ func main() {
 				packages,
 				envVars,
 				fileMounts,
+				workspace,
 			)
 			if err != nil {
 				logger.Error("execution failed", "error", err)
@@ -209,6 +223,54 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func resolveWorkspace(
+	ctx context.Context,
+	s *server.MCPServer,
+	fallback string,
+	logger *slog.Logger,
+) *sandbox.WorkspaceMount {
+	rootsResult, err := s.RequestRoots(ctx, mcp.ListRootsRequest{
+		Request: mcp.Request{Method: string(mcp.MethodListRoots)},
+	})
+	if err != nil {
+		logger.Debug("roots not available, using cwd fallback", "error", err)
+		if fallback != "" {
+			return &sandbox.WorkspaceMount{Path: fallback, Writable: true}
+		}
+		return nil
+	}
+
+	if len(rootsResult.Roots) == 0 {
+		logger.Debug("no roots provided, using cwd fallback")
+		if fallback != "" {
+			return &sandbox.WorkspaceMount{Path: fallback, Writable: true}
+		}
+		return nil
+	}
+
+	rootURI := rootsResult.Roots[0].URI
+	parsed, err := url.Parse(rootURI)
+	if err != nil {
+		logger.Debug("failed to parse root URI, using cwd fallback", "uri", rootURI, "error", err)
+		if fallback != "" {
+			return &sandbox.WorkspaceMount{Path: fallback, Writable: true}
+		}
+		return nil
+	}
+
+	path := parsed.Path
+	if path == "" {
+		logger.Debug("root URI has no path, using cwd fallback", "uri", rootURI)
+		if fallback != "" {
+			return &sandbox.WorkspaceMount{Path: fallback, Writable: true}
+		}
+		return nil
+	}
+
+	logger.Info("using workspace root from MCP client", "path", path)
+	return &sandbox.WorkspaceMount{Path: path, Writable: true}
 }
 
 func formatOutput(r *executor.ExecutionResult) string {

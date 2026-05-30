@@ -36,6 +36,11 @@ func New(cfg *config.Config, logger *slog.Logger) *Sandbox {
 	}
 }
 
+type WorkspaceMount struct {
+	Path     string
+	Writable bool
+}
+
 func (s *Sandbox) Run(
 	ctx context.Context,
 	command []string,
@@ -43,8 +48,9 @@ func (s *Sandbox) Run(
 	tmpDir string,
 	envVars []string,
 	fileMounts []FileMount,
+	workspace *WorkspaceMount,
 ) (*RunResult, error) {
-	args := s.buildBwrapArgs(command, envPath, tmpDir, fileMounts)
+	args := s.buildBwrapArgs(command, envPath, tmpDir, fileMounts, workspace)
 
 	s.logger.Debug("running sandboxed command",
 		"args", args,
@@ -87,6 +93,7 @@ func (s *Sandbox) buildBwrapArgs(
 	envPath string,
 	tmpDir string,
 	fileMounts []FileMount,
+	workspace *WorkspaceMount,
 ) []string {
 	args := []string{
 		"--unshare-all",
@@ -101,8 +108,12 @@ func (s *Sandbox) buildBwrapArgs(
 		"--dir", "/workspace/files",
 	}
 
-	if s.config.Sandbox.WorkspacePath != "" {
-		args = append(args, "--ro-bind", s.config.Sandbox.WorkspacePath, "/workspace")
+	if workspace != nil && workspace.Path != "" {
+		if workspace.Writable {
+			args = append(args, "--bind", workspace.Path, "/workspace")
+		} else {
+			args = append(args, "--ro-bind", workspace.Path, "/workspace")
+		}
 	}
 
 	for _, fm := range fileMounts {

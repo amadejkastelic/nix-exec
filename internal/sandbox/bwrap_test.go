@@ -18,6 +18,7 @@ func TestBuildBwrapArgs(t *testing.T) {
 		"/nix/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-env",
 		"/tmp/nix-exec-test",
 		nil,
+		nil,
 	)
 
 	expectedBinds := []struct {
@@ -68,7 +69,6 @@ func TestBuildBwrapArgs(t *testing.T) {
 
 func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 	cfg := config.Default()
-	cfg.Sandbox.WorkspacePath = "/home/user/project"
 	logger := slog.Default()
 	sb := New(cfg, logger)
 
@@ -77,6 +77,33 @@ func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 		"/nix/store/abc-env",
 		"/tmp/sandbox",
 		nil,
+		&WorkspaceMount{Path: "/home/user/project", Writable: true},
+	)
+
+	found := false
+	for i := 0; i < len(args)-2; i++ {
+		if args[i] == "--bind" && args[i+1] == "/home/user/project" &&
+			args[i+2] == "/workspace" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected workspace bind mount not found")
+	}
+}
+
+func TestBuildBwrapArgsWithWorkspaceReadOnly(t *testing.T) {
+	cfg := config.Default()
+	logger := slog.Default()
+	sb := New(cfg, logger)
+
+	args := sb.buildBwrapArgs(
+		[]string{"/env/bin/bash", "/tmp/script.sh"},
+		"/nix/store/abc-env",
+		"/tmp/sandbox",
+		nil,
+		&WorkspaceMount{Path: "/home/user/project", Writable: false},
 	)
 
 	found := false
@@ -88,7 +115,7 @@ func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected workspace bind mount not found")
+		t.Error("expected read-only workspace mount not found")
 	}
 }
 
@@ -107,6 +134,7 @@ func TestBuildBwrapArgsWithFileMounts(t *testing.T) {
 		"/nix/store/abc-env",
 		"/tmp/sandbox",
 		mounts,
+		nil,
 	)
 
 	roFound := false

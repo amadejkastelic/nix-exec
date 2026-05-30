@@ -12,10 +12,11 @@ import (
 )
 
 type mcpClient struct {
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout *bufio.Reader
-	nextID int
+	cmd       *exec.Cmd
+	stdin     io.WriteCloser
+	stdout    *bufio.Reader
+	nextID    int
+	rootsPath string
 }
 
 type jsonrpcMessage struct {
@@ -36,6 +37,11 @@ func newMCPClient() (*mcpClient, error) {
 		return nil, fmt.Errorf("NIX_EXEC_TEST_CONFIG not set")
 	}
 
+	workspacePath, err := os.MkdirTemp("", "nix-exec-workspace-*")
+	if err != nil {
+		return nil, fmt.Errorf("create workspace dir: %w", err)
+	}
+
 	cmd := exec.Command("nix-exec", "--config", configPath)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -51,10 +57,11 @@ func newMCPClient() (*mcpClient, error) {
 	}
 
 	return &mcpClient{
-		cmd:    cmd,
-		stdin:  stdin,
-		stdout: bufio.NewReaderSize(stdoutPipe, 1<<20),
-		nextID: 1,
+		cmd:       cmd,
+		stdin:     stdin,
+		stdout:    bufio.NewReaderSize(stdoutPipe, 1<<20),
+		nextID:    1,
+		rootsPath: workspacePath,
 	}, nil
 }
 
@@ -62,6 +69,9 @@ func (c *mcpClient) close() {
 	_ = c.stdin.Close()
 	_ = c.cmd.Process.Kill()
 	_ = c.cmd.Wait()
+	if c.rootsPath != "" {
+		_ = os.RemoveAll(c.rootsPath)
+	}
 }
 
 func (c *mcpClient) send(msg map[string]any) error {
@@ -118,9 +128,37 @@ func (c *mcpClient) call(method string, params any) jsonrpcMessage {
 	}
 	for {
 		resp := c.recv()
+		if resp.Method != "" && resp.ID != nil {
+			c.handleServerRequest(resp)
+			continue
+		}
 		if resp.ID != nil && *resp.ID == id {
 			return resp
 		}
+	}
+}
+
+func (c *mcpClient) handleServerRequest(msg jsonrpcMessage) {
+	switch msg.Method {
+	case "roots/list":
+		roots := []any{}
+		if c.rootsPath != "" {
+			roots = append(roots, map[string]any{
+				"uri":  "file://" + c.rootsPath,
+				"name": "test-workspace",
+			})
+		}
+		_ = c.send(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      *msg.ID,
+			"result":  map[string]any{"roots": roots},
+		})
+	default:
+		_ = c.send(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      *msg.ID,
+			"error":   map[string]any{"code": -32601, "message": "method not found"},
+		})
 	}
 }
 
@@ -186,6 +224,7 @@ func main() {
 		{"exit_code_propagation", testExitCodePropagation},
 		{"read_only_file_mount", testReadOnlyFileMount},
 		{"writable_file_mount", testWritableFileMount},
+		{"workspace_root_mount", testWorkspaceRootMount},
 	}
 
 	var passed, failed int
@@ -208,8 +247,10 @@ func main() {
 func testInitialize(c *mcpClient) error {
 	resp := c.call("initialize", map[string]any{
 		"protocolVersion": "2024-11-05",
-		"capabilities":    map[string]any{},
-		"clientInfo":      map[string]any{"name": "test", "version": "1.0.0"},
+		"capabilities": map[string]any{
+			"roots": map[string]any{"listChanged": true},
+		},
+		"clientInfo": map[string]any{"name": "test", "version": "1.0.0"},
 	})
 	if resp.Error != nil {
 		return fmt.Errorf("initialize error: %s", resp.Error.Message)
@@ -510,6 +551,32 @@ func testWritableFileMount(c *mcpClient) error {
 	}
 	if !strings.Contains(result.Content[0].Text, "ok") {
 		return fmt.Errorf("writable file output missing: %s", result.Content[0].Text)
+	}
+	return nil
+}
+
+func testWorkspaceRootMount(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "bash",
+		"code":     "echo 'hello from workspace' > /workspace/test-write.txt && cat /workspace/test-write.txt",
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	if !strings.Contains(result.Content[0].Text, "hello from workspace") {
+		return fmt.Errorf("workspace write/read failed: %s", result.Content[0].Text)
+	}
+
+	data, err := os.ReadFile(c.rootsPath + "/test-write.txt")
+	if err != nil {
+		return fmt.Errorf("file not found on host: %w", err)
+	}
+	if !strings.Contains(string(data), "hello from workspace") {
+		return fmt.Errorf("file content mismatch on host: %s", string(data))
 	}
 	return nil
 }
