@@ -558,7 +558,7 @@ func testWritableFileMount(c *mcpClient) error {
 func testWorkspaceRootMount(c *mcpClient) error {
 	resp := c.callTool("run_code", map[string]any{
 		"language": "bash",
-		"code":     "echo 'hello from workspace' > /workspace/test-write.txt && cat /workspace/test-write.txt",
+		"code":     "echo 'hello from workspace' > /workspace/test-write.txt && read -r line < /workspace/test-write.txt && echo \"$line\"",
 	})
 	result, err := parseToolResult(resp)
 	if err != nil {
