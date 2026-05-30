@@ -37,7 +37,7 @@ func New(cfg *config.Config, sb *sandbox.Sandbox, logger *slog.Logger) *Executor
 	return &Executor{
 		config:  cfg,
 		sandbox: sb,
-		cache:   NewEnvCache(cfg.Executor.CacheDir, logger),
+		cache:   NewEnvCache(cfg.Executor.CacheDir, cfg.Executor.CacheMaxSize, logger),
 		logger:  logger,
 	}
 }

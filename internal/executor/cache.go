@@ -9,17 +9,21 @@ import (
 )
 
 type EnvCache struct {
-	mu     sync.RWMutex
-	items  map[string]string
-	dir    string
-	logger *slog.Logger
+	mu      sync.RWMutex
+	items   map[string]string
+	order   []string
+	dir     string
+	maxSize int
+	logger  *slog.Logger
 }
 
-func NewEnvCache(dir string, logger *slog.Logger) *EnvCache {
+func NewEnvCache(dir string, maxSize int, logger *slog.Logger) *EnvCache {
 	c := &EnvCache{
-		items:  make(map[string]string),
-		dir:    dir,
-		logger: logger,
+		items:   make(map[string]string),
+		order:   make([]string, 0),
+		dir:     dir,
+		maxSize: maxSize,
+		logger:  logger,
 	}
 	c.load()
 	return c
@@ -48,6 +52,7 @@ func (c *EnvCache) evict(key, path string) {
 
 	if cur, ok := c.items[key]; ok && cur == path {
 		delete(c.items, key)
+		c.removeFromOrder(key)
 		c.persist()
 	}
 }
@@ -56,8 +61,33 @@ func (c *EnvCache) Set(key, path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if _, exists := c.items[key]; !exists {
+		c.order = append(c.order, key)
+	}
+
 	c.items[key] = path
+	c.enforceMax()
 	c.persist()
+}
+
+func (c *EnvCache) enforceMax() {
+	if c.maxSize <= 0 {
+		return
+	}
+	for len(c.items) > c.maxSize && len(c.order) > 0 {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.items, oldest)
+	}
+}
+
+func (c *EnvCache) removeFromOrder(key string) {
+	for i, k := range c.order {
+		if k == key {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+			return
+		}
+	}
 }
 
 func (c *EnvCache) load() {

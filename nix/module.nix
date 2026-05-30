@@ -75,6 +75,11 @@ in
                 default = "~/.cache/nix-exec";
                 description = "Directory for caching built Nix environments.";
               };
+              cache_max_size = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 64;
+                description = "Maximum number of cached environments.";
+              };
               temp_dir = lib.mkOption {
                 type = lib.types.str;
                 default = "/tmp";

@@ -31,6 +31,7 @@ type SandboxConfig struct {
 
 type ExecutorConfig struct {
 	CacheDir     string   `yaml:"cache_dir"`
+	CacheMaxSize int      `yaml:"cache_max_size"`
 	TempDir      string   `yaml:"temp_dir"`
 	NixpkgsURL   string   `yaml:"nixpkgs_url"`
 	Substituters []string `yaml:"substituters"`
@@ -55,9 +56,10 @@ func Default() *Config {
 			PackageDenylist: []string{},
 		},
 		Executor: ExecutorConfig{
-			CacheDir:   filepath.Join(home, ".cache", "nix-exec"),
-			TempDir:    os.TempDir(),
-			NixpkgsURL: "github:NixOS/nixpkgs/nixpkgs-unstable",
+			CacheDir:     filepath.Join(home, ".cache", "nix-exec"),
+			CacheMaxSize: 64,
+			TempDir:      os.TempDir(),
+			NixpkgsURL:   "github:NixOS/nixpkgs/nixpkgs-unstable",
 		},
 		Logging: LoggingConfig{
 			Level:  "info",
@@ -144,6 +146,7 @@ type flagPtrs struct {
 	workspacePath   *string
 	packageDenylist *string
 	cacheDir        *string
+	cacheMaxSize    *int
 	tempDir         *string
 	nixpkgsURL      *string
 	substituters    *string
@@ -178,6 +181,11 @@ func (c *Config) RegisterFlags(fs *flag.FlagSet) *flagPtrs {
 			"cache-dir",
 			c.Executor.CacheDir,
 			"Directory for caching built Nix environments",
+		),
+		cacheMaxSize: fs.Int(
+			"cache-max-size",
+			c.Executor.CacheMaxSize,
+			"Maximum number of cached environments (0 = unlimited)",
 		),
 		tempDir: fs.String(
 			"temp-dir",
@@ -217,6 +225,8 @@ func (c *Config) ApplyFlags(fs *flag.FlagSet, fp *flagPtrs) {
 			}
 		case "cache-dir":
 			c.Executor.CacheDir = *fp.cacheDir
+		case "cache-max-size":
+			c.Executor.CacheMaxSize = *fp.cacheMaxSize
 		case "temp-dir":
 			c.Executor.TempDir = *fp.tempDir
 		case "nixpkgs-url":
