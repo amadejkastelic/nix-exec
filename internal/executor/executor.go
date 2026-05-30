@@ -61,7 +61,7 @@ func (e *Executor) RunCode(
 			return nil, fmt.Errorf("invalid package name %q", pkg)
 		}
 		for _, denied := range e.config.Sandbox.PackageDenylist {
-			if pkg == denied {
+			if pkgDenied(pkg, denied) {
 				return nil, fmt.Errorf("package %q is not allowed", pkg)
 			}
 		}
@@ -364,6 +364,23 @@ var packageNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 
 func validPackageName(pkg string) bool {
 	return packageNameRe.MatchString(pkg)
+}
+
+func pkgDenied(pkg, denied string) bool {
+	if pkg == denied {
+		return true
+	}
+	if strings.HasPrefix(pkg, denied+".") {
+		return true
+	}
+	if after, ok := strings.CutPrefix(pkg, denied); ok && strings.HasPrefix(after, "Packages.") {
+		return true
+	}
+	_, suffix, hasDot := strings.Cut(pkg, ".")
+	if hasDot && suffix == denied {
+		return true
+	}
+	return false
 }
 
 func cacheKey(lang string, packages []string, nixpkgsURL string) string {

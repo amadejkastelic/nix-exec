@@ -156,6 +156,34 @@ func TestValidPackageName(t *testing.T) {
 	}
 }
 
+func TestPkgDenied(t *testing.T) {
+	tests := []struct {
+		pkg    string
+		denied string
+		want   bool
+	}{
+		{"bash", "bash", true},
+		{"bash", "python", false},
+		{"python3Packages.pandas", "python3Packages", true},
+		{"python3Packages.pandas", "pandas", true},
+		{"haskellPackages.lens", "lens", true},
+		{"haskellPackages.lens", "haskellPackages", true},
+		{"rubyPackages.pry", "pry", true},
+		{"ripgrep", "ripgrep", true},
+		{"ripgrep", "rip", false},
+		{"lua5_4Packages.dkjson", "dkjson", true},
+		{"lua5_4Packages.dkjson", "lua5_4Packages", true},
+		{"my-pkg", "my", false},
+	}
+
+	for _, tt := range tests {
+		got := pkgDenied(tt.pkg, tt.denied)
+		if got != tt.want {
+			t.Errorf("pkgDenied(%q, %q) = %v, want %v", tt.pkg, tt.denied, got, tt.want)
+		}
+	}
+}
+
 func TestGenerateFlake(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		flake := generateFlake(
