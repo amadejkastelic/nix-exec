@@ -1,4 +1,4 @@
 result*
-nix-exec
+./nix-exec
 .direnv
 .pre-commit-config.yaml
