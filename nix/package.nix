@@ -12,4 +12,6 @@ buildGoModule (finalAttrs: {
     "-w"
     "-X main.version=${finalAttrs.version}"
   ];
+
+  meta.mainProgram = "nix-exec";
 })
