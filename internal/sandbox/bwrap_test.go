@@ -48,6 +48,17 @@ func TestBuildBwrapArgs(t *testing.T) {
 		t.Errorf("expected first arg --unshare-all, got %s", args[0])
 	}
 
+	capDropFound := false
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--cap-drop" && args[i+1] == "ALL" {
+			capDropFound = true
+			break
+		}
+	}
+	if !capDropFound {
+		t.Error("expected --cap-drop ALL in args")
+	}
+
 	last := args[len(args)-1]
 	if last != "/tmp/script.sh" {
 		t.Errorf("expected last arg /tmp/script.sh, got %s", last)

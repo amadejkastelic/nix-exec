@@ -90,6 +90,7 @@ func (s *Sandbox) buildBwrapArgs(
 	args := []string{
 		"--unshare-all",
 		"--die-with-parent",
+		"--cap-drop", "ALL",
 		"--ro-bind", "/nix/store", "/nix/store",
 		"--ro-bind", envPath, "/env",
 		"--bind", tmpDir, "/tmp",
