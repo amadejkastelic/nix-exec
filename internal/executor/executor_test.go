@@ -13,6 +13,11 @@ func TestResolveInterpreter(t *testing.T) {
 		{"python", "python3", false},
 		{"bash", "bash", false},
 		{"node", "node", false},
+		{"haskell", "runhaskell", false},
+		{"lua", "lua", false},
+		{"ruby", "ruby", false},
+		{"perl", "perl", false},
+		{"octave", "octave", false},
 		{"rust", "", true},
 	}
 
@@ -37,6 +42,11 @@ func TestWithInterpreterPackage(t *testing.T) {
 		{"python", []string{"python3"}, []string{"python3"}},
 		{"bash", []string{"curl"}, []string{"bash", "curl"}},
 		{"node", []string{"ripgrep"}, []string{"nodejs", "ripgrep"}},
+		{"haskell", nil, []string{"haskellPackages.ghc"}},
+		{"lua", nil, []string{"lua5_4"}},
+		{"ruby", nil, []string{"ruby"}},
+		{"perl", nil, []string{"perl5"}},
+		{"octave", nil, []string{"octave"}},
 	}
 
 	for _, tt := range tests {
@@ -68,6 +78,11 @@ func TestScriptExtension(t *testing.T) {
 		{"python", ".py"},
 		{"bash", ".sh"},
 		{"node", ".js"},
+		{"haskell", ".hs"},
+		{"lua", ".lua"},
+		{"ruby", ".rb"},
+		{"perl", ".pl"},
+		{"octave", ".m"},
 		{"unknown", ""},
 	}
 
@@ -151,6 +166,139 @@ func TestGenerateFlake(t *testing.T) {
 		}
 		if contains(flake, "withPackages") {
 			t.Error("python flake without packages should not use withPackages")
+		}
+	})
+
+	t.Run("haskell_with_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"haskell",
+			[]string{"haskellPackages.ghc", "haskellPackages.lens", "haskellPackages.mtl"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("haskell flake should use withPackages")
+		}
+		if !contains(flake, "pkgs.haskellPackages.ghc.withPackages") {
+			t.Error("haskell flake should use pkgs.haskellPackages.ghc.withPackages")
+		}
+		if !contains(flake, "ps.lens") {
+			t.Error("haskell flake should reference ps.lens")
+		}
+		if !contains(flake, "ps.mtl") {
+			t.Error("haskell flake should reference ps.mtl")
+		}
+		if contains(flake, "pkgs.haskellPackages.lens") {
+			t.Error("haskell flake should not reference haskellPackages directly in paths")
+		}
+	})
+
+	t.Run("haskell_no_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"haskell",
+			[]string{"haskellPackages.ghc"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "pkgs.haskellPackages.ghc\n") {
+			t.Error("haskell flake without packages should use pkgs.haskellPackages.ghc directly")
+		}
+		if contains(flake, "withPackages") {
+			t.Error("haskell flake without packages should not use withPackages")
+		}
+	})
+
+	t.Run("lua_with_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"lua",
+			[]string{"lua5_4", "lua5_4Packages.busted", "lua5_4Packages.luafilesystem"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("lua flake should use withPackages")
+		}
+		if !contains(flake, "pkgs.lua5_4.withPackages") {
+			t.Error("lua flake should use pkgs.lua5_4.withPackages")
+		}
+		if !contains(flake, "ps.busted") {
+			t.Error("lua flake should reference ps.busted")
+		}
+	})
+
+	t.Run("ruby_with_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"ruby",
+			[]string{"ruby", "rubyPackages.pry"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("ruby flake should use withPackages")
+		}
+		if !contains(flake, "pkgs.ruby.withPackages") {
+			t.Error("ruby flake should use pkgs.ruby.withPackages")
+		}
+		if !contains(flake, "ps.pry") {
+			t.Error("ruby flake should reference ps.pry")
+		}
+	})
+
+	t.Run("perl_with_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"perl",
+			[]string{"perl5", "perlPackages.Moose"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("perl flake should use withPackages")
+		}
+		if !contains(flake, "pkgs.perl5.withPackages") {
+			t.Error("perl flake should use pkgs.perl5.withPackages")
+		}
+		if !contains(flake, "ps.Moose") {
+			t.Error("perl flake should reference ps.Moose")
+		}
+	})
+
+	t.Run("octave_with_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"octave",
+			[]string{"octave", "octavePackages.signal"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("octave flake should use withPackages")
+		}
+		if !contains(flake, "pkgs.octave.withPackages") {
+			t.Error("octave flake should use pkgs.octave.withPackages")
+		}
+		if !contains(flake, "ps.signal") {
+			t.Error("octave flake should reference ps.signal")
+		}
+	})
+
+	t.Run("mixed_with_other_packages", func(t *testing.T) {
+		flake := generateFlake(
+			"python",
+			[]string{"python3", "python3Packages.numpy", "ripgrep"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "withPackages") {
+			t.Error("should use withPackages for python packages")
+		}
+		if !contains(flake, "ps.numpy") {
+			t.Error("should reference ps.numpy")
+		}
+		if !contains(flake, "pkgs.ripgrep") {
+			t.Error("should include non-language packages as pkgs.ripgrep")
+		}
+	})
+
+	t.Run("unknown_language", func(t *testing.T) {
+		flake := generateFlake(
+			"unknown",
+			[]string{"bash"},
+			"github:NixOS/nixpkgs/nixpkgs-unstable",
+		)
+		if !contains(flake, "pkgs.bash") {
+			t.Error("unknown language should fall back to plain pkgs references")
 		}
 	})
 }

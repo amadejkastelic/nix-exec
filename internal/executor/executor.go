@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -179,44 +180,114 @@ func (e *Executor) buildEnvironment(
 	return storePath, nil
 }
 
+type langConfig struct {
+	interpreter     string
+	interpreterPath string
+	pkgSetPrefix    string
+	extension       string
+}
+
+var langConfigs = map[string]langConfig{
+	"python": {
+		interpreter:     "python3",
+		interpreterPath: "python3",
+		pkgSetPrefix:    "python3Packages",
+		extension:       ".py",
+	},
+	"bash": {
+		interpreter:     "bash",
+		interpreterPath: "bash",
+		extension:       ".sh",
+	},
+	"node": {
+		interpreter:     "node",
+		interpreterPath: "nodejs",
+		extension:       ".js",
+	},
+	"haskell": {
+		interpreter:     "runhaskell",
+		interpreterPath: "haskellPackages.ghc",
+		pkgSetPrefix:    "haskellPackages",
+		extension:       ".hs",
+	},
+	"lua": {
+		interpreter:     "lua",
+		interpreterPath: "lua5_4",
+		pkgSetPrefix:    "lua5_4Packages",
+		extension:       ".lua",
+	},
+	"ruby": {
+		interpreter:     "ruby",
+		interpreterPath: "ruby",
+		pkgSetPrefix:    "rubyPackages",
+		extension:       ".rb",
+	},
+	"perl": {
+		interpreter:     "perl",
+		interpreterPath: "perl5",
+		pkgSetPrefix:    "perlPackages",
+		extension:       ".pl",
+	},
+	"octave": {
+		interpreter:     "octave",
+		interpreterPath: "octave",
+		pkgSetPrefix:    "octavePackages",
+		extension:       ".m",
+	},
+}
+
 func generateFlake(lang string, packages []string, nixpkgsURL string) string {
 	system := nixSystem()
+	cfg, ok := langConfigs[lang]
+	if !ok {
+		return generateFlakeDefault(system, packages, nixpkgsURL)
+	}
 
-	var pathsBuilder strings.Builder
+	if cfg.pkgSetPrefix == "" {
+		return generateFlakeDefault(system, packages, nixpkgsURL)
+	}
 
-	if lang == "python" {
-		var pythonPkgs []string
-		var otherPkgs []string
+	var langPkgs []string
+	var otherPkgs []string
 
-		for _, pkg := range packages {
-			if after, ok := strings.CutPrefix(pkg, "python3Packages."); ok {
-				pythonPkgs = append(pythonPkgs, after)
-			} else if pkg == "python3" {
-				// handled by withPackages below
-			} else {
-				otherPkgs = append(otherPkgs, pkg)
-			}
-		}
-
-		if len(pythonPkgs) > 0 {
-			fmt.Fprintf(&pathsBuilder, "      (pkgs.python3.withPackages (ps: [\n")
-			for _, p := range pythonPkgs {
-				fmt.Fprintf(&pathsBuilder, "        ps.%s\n", p)
-			}
-			fmt.Fprintf(&pathsBuilder, "      ]))\n")
+	for _, pkg := range packages {
+		if pkg == cfg.interpreterPath {
+			// handled by withPackages below
+		} else if after, found := strings.CutPrefix(pkg, cfg.pkgSetPrefix+"."); found {
+			langPkgs = append(langPkgs, after)
 		} else {
-			fmt.Fprintf(&pathsBuilder, "      pkgs.python3\n")
-		}
-
-		for _, pkg := range otherPkgs {
-			fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
-		}
-	} else {
-		for _, pkg := range packages {
-			fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
+			otherPkgs = append(otherPkgs, pkg)
 		}
 	}
 
+	var pathsBuilder strings.Builder
+
+	if len(langPkgs) > 0 {
+		fmt.Fprintf(&pathsBuilder, "      (pkgs.%s.withPackages (ps: [\n", cfg.interpreterPath)
+		for _, p := range langPkgs {
+			fmt.Fprintf(&pathsBuilder, "        ps.%s\n", p)
+		}
+		fmt.Fprintf(&pathsBuilder, "      ]))\n")
+	} else {
+		fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", cfg.interpreterPath)
+	}
+
+	for _, pkg := range otherPkgs {
+		fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
+	}
+
+	return formatFlake(nixpkgsURL, system, pathsBuilder.String())
+}
+
+func generateFlakeDefault(system string, packages []string, nixpkgsURL string) string {
+	var pathsBuilder strings.Builder
+	for _, pkg := range packages {
+		fmt.Fprintf(&pathsBuilder, "      pkgs.%s\n", pkg)
+	}
+	return formatFlake(nixpkgsURL, system, pathsBuilder.String())
+}
+
+func formatFlake(nixpkgsURL, system, paths string) string {
 	return fmt.Sprintf(`{
   inputs.nixpkgs.url = "%s";
 
@@ -229,7 +300,7 @@ func generateFlake(lang string, packages []string, nixpkgsURL string) string {
     };
   };
 }
-`, nixpkgsURL, system, system, pathsBuilder.String())
+`, nixpkgsURL, system, system, paths)
 }
 
 func nixSystem() string {
@@ -256,47 +327,31 @@ func cacheKey(lang string, packages []string) string {
 }
 
 func resolveInterpreter(lang string) (string, error) {
-	switch lang {
-	case "python":
-		return "python3", nil
-	case "bash":
-		return "bash", nil
-	case "node":
-		return "node", nil
-	default:
+	cfg, ok := langConfigs[lang]
+	if !ok {
 		return "", fmt.Errorf("unsupported language: %s", lang)
 	}
+	return cfg.interpreter, nil
 }
 
 func withInterpreterPackage(lang string, packages []string) []string {
-	pkg := map[string]string{
-		"python": "python3",
-		"bash":   "bash",
-		"node":   "nodejs",
-	}[lang]
-
-	if pkg == "" {
+	cfg, ok := langConfigs[lang]
+	if !ok {
 		return packages
 	}
 
-	for _, p := range packages {
-		if p == pkg {
-			return packages
-		}
+	pkg := cfg.interpreterPath
+	if slices.Contains(packages, pkg) {
+		return packages
 	}
 
 	return append([]string{pkg}, packages...)
 }
 
 func scriptExtension(lang string) string {
-	switch lang {
-	case "python":
-		return ".py"
-	case "bash":
-		return ".sh"
-	case "node":
-		return ".js"
-	default:
+	cfg, ok := langConfigs[lang]
+	if !ok {
 		return ""
 	}
+	return cfg.extension
 }

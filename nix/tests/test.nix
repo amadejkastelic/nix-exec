@@ -28,6 +28,41 @@ in
           paths = [ (pkgs.python3.withPackages pythonPkgs) ];
         };
 
+      mkHaskellEnv =
+        haskellPkgs:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = [ (pkgs.haskellPackages.ghc.withPackages haskellPkgs) ];
+        };
+
+      mkLuaEnv =
+        luaPkgs:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = [ (pkgs.lua5_4.withPackages luaPkgs) ];
+        };
+
+      mkRubyEnv =
+        rubyPkgs:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = [ (pkgs.ruby.withPackages rubyPkgs) ];
+        };
+
+      mkPerlEnv =
+        perlPkgs:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = [ (pkgs.perl5.withPackages perlPkgs) ];
+        };
+
+      mkOctaveEnv =
+        octavePkgs:
+        pkgs.buildEnv {
+          name = "nix-exec-env";
+          paths = [ (pkgs.octave.withPackages octavePkgs) ];
+        };
+
       testEnvs = [
         (mkEnv [ pkgs.bash ])
         (mkEnv [
@@ -37,6 +72,16 @@ in
         (mkEnv [ pkgs.python3 ])
         (mkEnv [ pkgs.nodejs ])
         (mkPythonEnv (ps: [ ps.pandas ]))
+        (mkEnv [ pkgs.haskellPackages.ghc ])
+        (mkHaskellEnv (ps: [ ps.vector ]))
+        (mkEnv [ pkgs.lua5_4 ])
+        (mkLuaEnv (ps: [ ps.dkjson ]))
+        (mkEnv [ pkgs.ruby ])
+        (mkRubyEnv (ps: [ ps.pg ]))
+        (mkEnv [ pkgs.perl5 ])
+        (mkPerlEnv (ps: [ ps.JSON ]))
+        (mkEnv [ pkgs.octave ])
+        (mkOctaveEnv (ps: [ ps.doctest ]))
       ];
     in
     {
@@ -60,7 +105,7 @@ in
       };
 
       virtualisation.memorySize = 4096;
-      virtualisation.diskSize = 8192;
+      virtualisation.diskSize = 16384;
       virtualisation.writableStore = true;
       virtualisation.additionalPaths = testEnvs;
     };

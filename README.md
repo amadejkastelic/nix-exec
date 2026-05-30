@@ -6,7 +6,7 @@ Designed for AI agents that need to run arbitrary code safely — each execution
 
 ## Features
 
-- **`run_code` tool** — execute Python, Bash, or Node.js code from any MCP client
+- **`run_code` tool** — execute Python, Bash, Node.js, Haskell, Lua, Ruby, Perl, or Octave code from any MCP client
 - **Reproducible environments** — Nix flake-based dependency resolution with built-in caching
 - **Sandboxed execution** — Bubblewrap isolates every run (separate PID/IPC/net mount namespaces, read-only nix store)
 - **Configurable** — YAML config file, environment variables, and CLI flags with sensible defaults
@@ -42,7 +42,7 @@ A config file is optional — sensible defaults are used if none is found. Confi
 
 | Parameter        | Type     | Required | Description                                                              |
 |------------------|----------|----------|--------------------------------------------------------------------------|
-| `language`       | string   | yes      | `python`, `bash`, or `node`                                              |
+| `language`       | string   | yes      | `python`, `bash`, `node`, `haskell`, `lua`, `ruby`, `perl`, or `octave` |
 | `code`           | string   | yes      | Source code to execute                                                   |
 | `packages`       | string[] | no       | Nix packages to include (e.g. `"ripgrep"`, `"python3Packages.pandas"`)  |
 | `env`            | object   | no       | Environment variables to set in the sandbox                              |
@@ -70,6 +70,21 @@ Example — read a host file:
 ```
 
 ### Configuration
+
+### Supported Languages
+
+| Language   | `language`  | Interpreter       | Package set prefix     | Example package              |
+|------------|-------------|-------------------|------------------------|------------------------------|
+| Python     | `python`    | `python3`         | `python3Packages`      | `python3Packages.pandas`    |
+| Bash       | `bash`      | `bash`            | *(none)*               | `ripgrep`                   |
+| Node.js    | `node`      | `node`            | *(none)*               | `nodejs`                    |
+| Haskell    | `haskell`   | `runhaskell`      | `haskellPackages`      | `haskellPackages.lens`      |
+| Lua        | `lua`       | `lua`             | `lua5_4Packages`       | `lua5_4Packages.dkjson`     |
+| Ruby       | `ruby`      | `ruby`            | `rubyPackages`         | `rubyPackages.pry`          |
+| Perl       | `perl`      | `perl`            | `perlPackages`         | `perlPackages.JSON`         |
+| Octave     | `octave`    | `octave`          | `octavePackages`       | `octavePackages.signal`     |
+
+Languages with a package set prefix use `{interpreter}.withPackages(...)` internally, so libraries are properly registered with the runtime (e.g. Python's `site-packages`, GHC's package database, Lua's `LUA_PATH`).
 
 See [`config.example.yaml`](config.example.yaml) for all options with defaults.
 
@@ -188,7 +203,7 @@ go test ./...
 ## How it works
 
 1. The executor resolves the language to an interpreter and generates a Nix flake that builds a `buildEnv` with the requested packages.
-2. For Python packages (`python3Packages.*`), the flake uses `python3.withPackages` so dependencies are properly wired into `site-packages`.
+2. For languages with package sets (Python, Haskell, Lua, Ruby, Perl, Octave), packages matching the set prefix (e.g. `python3Packages.*`, `haskellPackages.*`) are grouped and installed via `{interpreter}.withPackages` so dependencies are properly wired (e.g. into `site-packages`, GHC's package db, Lua's `LUA_PATH`, etc.).
 3. The flake is built with `nix build`, and the resulting store path is cached (keyed by language + sorted package list).
 4. The sandbox spawns Bubblewrap with the built environment mounted at `/env`, the script in `/tmp`, and full namespace isolation.
 5. Output is captured, truncated to `max_output_bytes`, and returned as MCP tool result text.

@@ -169,6 +169,15 @@ func main() {
 		{"python_execution", testPythonExecution},
 		{"python_with_pandas", testPythonWithPandas},
 		{"node_execution", testNodeExecution},
+		{"haskell_execution", testHaskellExecution},
+		{"haskell_with_vector", testHaskellWithVector},
+		{"lua_execution", testLuaExecution},
+		{"lua_with_dkjson", testLuaWithDkjson},
+		{"ruby_execution", testRubyExecution},
+		{"ruby_with_pg", testRubyWithPg},
+		{"perl_execution", testPerlExecution},
+		{"perl_with_json", testPerlWithJSON},
+		{"octave_execution", testOctaveExecution},
 		{"filesystem_isolation", testFilesystemIsolation},
 		{"network_isolation", testNetworkIsolation},
 		{"timeout_enforcement", testTimeoutEnforcement},
@@ -519,6 +528,210 @@ func testNodeExecution(c *mcpClient) error {
 	}
 	if !strings.Contains(result.Content[0].Text, "node ") {
 		return fmt.Errorf("node output missing: %s", result.Content[0].Text)
+	}
+	return nil
+}
+
+func testHaskellExecution(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "haskell",
+		"code":     `main = putStrLn "hello from haskell"`,
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "hello from haskell") {
+		return fmt.Errorf("haskell output missing: %s", text)
+	}
+	if !strings.Contains(text, "Exit code: 0") {
+		return fmt.Errorf("wrong exit code: %s", text)
+	}
+	return nil
+}
+
+func testHaskellWithVector(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "haskell",
+		"code": `import qualified Data.Vector as V
+main = print (V.sum (V.fromList [1,2,3,4,5] :: V.Vector Int))`,
+		"packages": []any{
+			"haskellPackages.vector",
+		},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "15") {
+		return fmt.Errorf("vector sum output missing: %s", text)
+	}
+	return nil
+}
+
+func testLuaExecution(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "lua",
+		"code":     `print("hello from lua " .. _VERSION)`,
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "hello from lua") {
+		return fmt.Errorf("lua output missing: %s", text)
+	}
+	if !strings.Contains(text, "Exit code: 0") {
+		return fmt.Errorf("wrong exit code: %s", text)
+	}
+	return nil
+}
+
+func testLuaWithDkjson(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "lua",
+		"code": `local dkjson = require "dkjson"
+local data = {name = "test", value = 42}
+local str = dkjson.encode(data)
+print(str)`,
+		"packages": []any{
+			"lua5_4Packages.dkjson",
+		},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "test") || !strings.Contains(text, "42") {
+		return fmt.Errorf("json output missing: %s", text)
+	}
+	return nil
+}
+
+func testRubyExecution(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "ruby",
+		"code":     `puts "hello from ruby #{RUBY_VERSION}"`,
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "hello from ruby") {
+		return fmt.Errorf("ruby output missing: %s", text)
+	}
+	if !strings.Contains(text, "Exit code: 0") {
+		return fmt.Errorf("wrong exit code: %s", text)
+	}
+	return nil
+}
+
+func testRubyWithPg(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "ruby",
+		"code":     `require 'pg'; puts PG::version_string`,
+		"packages": []any{
+			"rubyPackages.pg",
+		},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "PG") && !strings.Contains(text, "pg") {
+		return fmt.Errorf("pg gem output missing: %s", text)
+	}
+	return nil
+}
+
+func testPerlExecution(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "perl",
+		"code":     `print "hello from perl $]\n";`,
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "hello from perl") {
+		return fmt.Errorf("perl output missing: %s", text)
+	}
+	if !strings.Contains(text, "Exit code: 0") {
+		return fmt.Errorf("wrong exit code: %s", text)
+	}
+	return nil
+}
+
+func testPerlWithJSON(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "perl",
+		"code": `use JSON;
+my $json = encode_json({name => "test", value => 42});
+print "$json\n";`,
+		"packages": []any{
+			"perlPackages.JSON",
+		},
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "test") || !strings.Contains(text, "42") {
+		return fmt.Errorf("json output missing: %s", text)
+	}
+	return nil
+}
+
+func testOctaveExecution(c *mcpClient) error {
+	resp := c.callTool("run_code", map[string]any{
+		"language": "octave",
+		"code":     `disp("hello from octave"); disp(version);`,
+	})
+	result, err := parseToolResult(resp)
+	if err != nil {
+		return err
+	}
+	if result.IsError {
+		return fmt.Errorf("tool error: %s", result.Content[0].Text)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "hello from octave") {
+		return fmt.Errorf("octave output missing: %s", text)
+	}
+	if !strings.Contains(text, "Exit code: 0") {
+		return fmt.Errorf("wrong exit code: %s", text)
 	}
 	return nil
 }
