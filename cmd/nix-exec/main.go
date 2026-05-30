@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -151,6 +152,25 @@ func main() {
 			}
 
 			return mcp.NewToolResultText(formatOutput(result)), nil
+		},
+	)
+
+	listLangsTool := mcp.NewTool(
+		"list_languages",
+		mcp.WithDescription(
+			"List supported programming languages, their interpreters, and package set prefixes.",
+		),
+	)
+
+	s.AddTool(
+		listLangsTool,
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			langs := executor.ListLanguages()
+			data, err := json.MarshalIndent(langs, "", "  ")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return mcp.NewToolResultText(string(data)), nil
 		},
 	)
 

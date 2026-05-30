@@ -227,6 +227,27 @@ type langConfig struct {
 	extension       string
 }
 
+type LanguageInfo struct {
+	Name         string `json:"name"`
+	Interpreter  string `json:"interpreter"`
+	PkgSetPrefix string `json:"pkg_set_prefix,omitempty"`
+}
+
+func ListLanguages() []LanguageInfo {
+	var langs []LanguageInfo
+	for name, cfg := range langConfigs {
+		langs = append(langs, LanguageInfo{
+			Name:         name,
+			Interpreter:  cfg.interpreter,
+			PkgSetPrefix: cfg.pkgSetPrefix,
+		})
+	}
+	sort.Slice(langs, func(i, j int) bool {
+		return langs[i].Name < langs[j].Name
+	})
+	return langs
+}
+
 var langConfigs = map[string]langConfig{
 	"python": {
 		interpreter:     "python3",
