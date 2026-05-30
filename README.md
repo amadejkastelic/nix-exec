@@ -9,7 +9,7 @@ Designed for AI agents that need to run arbitrary code safely — each execution
 - **`run_code` tool** — execute Python, Bash, or Node.js code from any MCP client
 - **Reproducible environments** — Nix flake-based dependency resolution with built-in caching
 - **Sandboxed execution** — Bubblewrap isolates every run (separate PID/IPC/net mount namespaces, read-only nix store)
-- **Configurable** — YAML config file with sensible defaults
+- **Configurable** — YAML config file, environment variables, and CLI flags with sensible defaults
 - **NixOS module** — declarative deployment via `programs.nix-exec`
 
 ## Usage
@@ -22,17 +22,21 @@ Configure your MCP client (e.g. Claude Desktop, opencode) to run:
 {
   "mcpServers": {
     "nix-exec": {
-      "command": "nix-exec"
+      "command": "nix-exec",
+      "args": ["-log-level", "debug", "-timeout", "60s"]
     }
   }
 }
 ```
 
-A config file is optional — sensible defaults are used if none is found. When no `-config` flag or `NIX_EXEC_CONFIG` env var is set, the following locations are searched in order:
+A config file is optional — sensible defaults are used if none is found. Configuration is loaded in this order (later sources override earlier ones):
 
-1. `$XDG_CONFIG_HOME/nix-exec/config.yaml`
-2. `~/.nix-exec.yaml`
-3. `/etc/nix-exec/config.yaml`
+1. **Built-in defaults**
+2. **Config file** — set via `-config` flag or `NIX_EXEC_CONFIG` env var. When neither is set, the following locations are searched:
+   - `$XDG_CONFIG_HOME/nix-exec/config.yaml`
+   - `~/.nix-exec.yaml`
+   - `/etc/nix-exec/config.yaml`
+3. **CLI flags** — override all other sources
 
 ### The `run_code` tool
 
@@ -69,13 +73,36 @@ Example — read a host file:
 
 See [`config.example.yaml`](config.example.yaml) for all options with defaults.
 
+#### CLI Flags
+
+All settings can also be set via command-line flags, which take precedence over the config file:
+
+| Flag                      | Default                                 | Description                                  |
+|---------------------------|-----------------------------------------|----------------------------------------------|
+| `-config`                 | `""`                                    | Path to config file                          |
+| `-name`                   | `nix-exec`                              | Server name                                  |
+| `-timeout`                | `30s`                                   | Max execution time per run                   |
+| `-max-output-bytes`       | `1048576`                               | Max stdout/stderr captured (bytes)           |
+| `-workspace-path`         | `""`                                    | Host path mounted read-only at `/workspace`  |
+| `-package-denylist`       | `""`                                    | Comma-separated list of denied packages      |
+| `-cache-dir`              | `~/.cache/nix-exec`                     | Cached Nix environment store                 |
+| `-temp-dir`               | `/tmp`                                  | Base directory for temporary files           |
+| `-nixpkgs-url`            | `github:NixOS/nixpkgs/nixpkgs-unstable` | Nixpkgs flake URL for resolving packages     |
+| `-substituters`           | `""`                                    | Comma-separated list of Nix substituters     |
+| `-log-level`              | `info`                                  | Log level: `debug`, `info`, `warn`, `error`  |
+| `-log-format`             | `json`                                  | Log format: `json` or `text`                 |
+
+#### Config File Settings
+
 | Setting                     | Default                                 | Description                                  |
 |-----------------------------|-----------------------------------------|----------------------------------------------|
+| `server.name`               | `nix-exec`                              | Server name                                  |
 | `sandbox.timeout`           | `30s`                                   | Max execution time per run                   |
 | `sandbox.max_output_bytes`  | `1048576`                               | Max stdout/stderr captured (bytes)           |
 | `sandbox.workspace_path`    | `""`                                    | Host path mounted read-only at `/workspace`  |
 | `sandbox.package_denylist`  | `[]`                                    | Nix packages that are never allowed          |
 | `executor.cache_dir`        | `~/.cache/nix-exec`                     | Cached Nix environment store                 |
+| `executor.temp_dir`         | `/tmp`                                  | Base directory for temporary files           |
 | `executor.nixpkgs_url`      | `github:NixOS/nixpkgs/nixpkgs-unstable` | Nixpkgs flake URL for resolving packages     |
 | `executor.substituters`     | `null`                                  | Nix substituters (`null` = system defaults)  |
 | `logging.level`             | `info`                                  | Log level: `debug`, `info`, `warn`, `error`  |

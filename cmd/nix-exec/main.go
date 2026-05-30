@@ -19,6 +19,8 @@ import (
 var version = "dev"
 
 func main() {
+	cfg := config.Default()
+	fp := cfg.RegisterFlags(flag.CommandLine)
 	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
 
@@ -26,11 +28,16 @@ func main() {
 		*configPath = envPath
 	}
 
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
-		os.Exit(1)
+	if *configPath != "" {
+		loaded, err := config.Load(*configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+		*cfg = *loaded
 	}
+
+	cfg.ApplyFlags(flag.CommandLine, fp)
 
 	logger := setupLogger(cfg)
 
