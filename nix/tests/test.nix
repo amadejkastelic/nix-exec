@@ -46,7 +46,7 @@ in
         enable = true;
         settings = {
           server.name = "nix-exec-test";
-          sandbox.timeout = "5s";
+          sandbox.timeout = "5m";
           executor = {
             cache_dir = "/tmp/nix-exec-cache";
             nixpkgs_url = "path:${nixpkgs-path}";
