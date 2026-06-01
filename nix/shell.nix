@@ -1,4 +1,6 @@
 {
+  lib,
+  stdenv,
   mkShell,
   delve,
   go,
@@ -17,6 +19,8 @@ mkShell {
     golines
     gotools
     gopls
+  ]
+  ++ lib.optionals stdenv.isLinux [
     bubblewrap
   ];
 
