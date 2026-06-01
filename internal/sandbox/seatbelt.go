@@ -82,7 +82,8 @@ func (s *SeatbeltBackend) buildSeatbeltProfile(
 	b.WriteString("(allow signal (target self))\n")
 	b.WriteString("(allow sysctl-read)\n")
 	b.WriteString("(allow mach-lookup)\n")
-	b.WriteString("(allow ipc-posix-shm)\n\n")
+	b.WriteString("(allow ipc-posix-shm)\n")
+	b.WriteString("(allow file-read-metadata)\n\n")
 
 	b.WriteString("(allow file-read*\n")
 	for _, p := range systemReadPaths {
@@ -124,9 +125,8 @@ var systemReadPaths = []string{
 	"/dev",
 	"/etc",
 	"/tmp",
-	"/private/tmp",
+	"/private",
 	"/var",
-	"/private/var",
 	"/Applications",
 	"/Library",
 }
