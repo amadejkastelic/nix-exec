@@ -17,6 +17,7 @@ func TestSeatbeltProfileBasic(t *testing.T) {
 		"/tmp/nix-exec-test",
 		nil,
 		nil,
+		GPUNone,
 	)
 
 	if !strings.Contains(profile, "(version 1)") {
@@ -45,6 +46,7 @@ func TestSeatbeltProfileWithWorkspace(t *testing.T) {
 		"/tmp/nix-exec-test",
 		nil,
 		&WorkspaceMount{Path: "/Users/me/project", Writable: true},
+		GPUNone,
 	)
 
 	if !strings.Contains(profile, `(subpath "/Users/me/project")`) {
@@ -66,6 +68,7 @@ func TestSeatbeltProfileWorkspaceReadOnly(t *testing.T) {
 		"/tmp/nix-exec-test",
 		nil,
 		&WorkspaceMount{Path: "/Users/me/project", Writable: false},
+		GPUNone,
 	)
 
 	if !strings.Contains(profile, `(subpath "/Users/me/project")`) {
@@ -75,6 +78,46 @@ func TestSeatbeltProfileWorkspaceReadOnly(t *testing.T) {
 	writeSection := profile[strings.LastIndex(profile, "(allow file-write*"):]
 	if strings.Contains(writeSection, `/Users/me/project`) {
 		t.Error("workspace should not appear in write section when not writable")
+	}
+}
+
+func TestSeatbeltProfileWithGPU(t *testing.T) {
+	cfg := config.Default()
+	logger := slog.Default()
+	s := &SeatbeltBackend{config: cfg, logger: logger}
+
+	profile := s.buildSeatbeltProfile(
+		"/tmp/nix-exec-test",
+		nil,
+		nil,
+		GPUNvidia,
+	)
+
+	if !strings.Contains(profile, "(allow iokit-open)") {
+		t.Error("missing iokit-open allow for GPU")
+	}
+	if !strings.Contains(profile, "(allow device-open)") {
+		t.Error("missing device-open allow for GPU")
+	}
+}
+
+func TestSeatbeltProfileNoGPU(t *testing.T) {
+	cfg := config.Default()
+	logger := slog.Default()
+	s := &SeatbeltBackend{config: cfg, logger: logger}
+
+	profile := s.buildSeatbeltProfile(
+		"/tmp/nix-exec-test",
+		nil,
+		nil,
+		GPUNone,
+	)
+
+	if strings.Contains(profile, "(allow iokit-open)") {
+		t.Error("iokit-open should not be present without GPU")
+	}
+	if strings.Contains(profile, "(allow device-open)") {
+		t.Error("device-open should not be present without GPU")
 	}
 }
 
@@ -92,6 +135,7 @@ func TestSeatbeltProfileWithFileMounts(t *testing.T) {
 		"/tmp/nix-exec-test",
 		mounts,
 		nil,
+		GPUNone,
 	)
 
 	if !strings.Contains(profile, `(subpath "/Users/me/data.csv")`) {

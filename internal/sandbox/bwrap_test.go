@@ -12,13 +12,17 @@ func TestBuildBwrapArgs(t *testing.T) {
 	logger := slog.Default()
 	b := &BwrapBackend{config: cfg, logger: logger}
 
-	args := b.buildBwrapArgs(
+	args, _, err := b.buildBwrapArgs(
 		[]string{"/env/bin/bash", "/tmp/script.sh"},
 		"/nix/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-env",
 		"/tmp/nix-exec-test",
 		nil,
 		nil,
+		GPUNone,
 	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	expectedBinds := []struct {
 		src, dst string
@@ -71,13 +75,17 @@ func TestBuildBwrapArgsWithWorkspace(t *testing.T) {
 	logger := slog.Default()
 	b := &BwrapBackend{config: cfg, logger: logger}
 
-	args := b.buildBwrapArgs(
+	args, _, err := b.buildBwrapArgs(
 		[]string{"/env/bin/bash", "/tmp/script.sh"},
 		"/nix/store/abc-env",
 		"/tmp/sandbox",
 		nil,
 		&WorkspaceMount{Path: "/home/user/project", Writable: true},
+		GPUNone,
 	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	found := false
 	for i := 0; i < len(args)-2; i++ {
@@ -97,13 +105,17 @@ func TestBuildBwrapArgsWithWorkspaceReadOnly(t *testing.T) {
 	logger := slog.Default()
 	b := &BwrapBackend{config: cfg, logger: logger}
 
-	args := b.buildBwrapArgs(
+	args, _, err := b.buildBwrapArgs(
 		[]string{"/env/bin/bash", "/tmp/script.sh"},
 		"/nix/store/abc-env",
 		"/tmp/sandbox",
 		nil,
 		&WorkspaceMount{Path: "/home/user/project", Writable: false},
+		GPUNone,
 	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	found := false
 	for i := 0; i < len(args)-2; i++ {
@@ -128,13 +140,17 @@ func TestBuildBwrapArgsWithFileMounts(t *testing.T) {
 		{HostPath: "/host/output", Writable: true},
 	}
 
-	args := b.buildBwrapArgs(
+	args, _, err := b.buildBwrapArgs(
 		[]string{"/env/bin/bash", "/tmp/script.sh"},
 		"/nix/store/abc-env",
 		"/tmp/sandbox",
 		mounts,
 		nil,
+		GPUNone,
 	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	roFound := false
 	rwFound := false

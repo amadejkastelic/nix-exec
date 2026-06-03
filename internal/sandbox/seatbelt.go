@@ -24,8 +24,9 @@ func (s *SeatbeltBackend) Run(
 	envVars []string,
 	fileMounts []FileMount,
 	workspace *WorkspaceMount,
+	gpu GPUVendor,
 ) (*RunResult, error) {
-	profile := s.buildSeatbeltProfile(tmpDir, fileMounts, workspace)
+	profile := s.buildSeatbeltProfile(tmpDir, fileMounts, workspace, gpu)
 
 	args := []string{"-p", profile, "--"}
 	args = append(args, command...)
@@ -70,6 +71,7 @@ func (s *SeatbeltBackend) buildSeatbeltProfile(
 	tmpDir string,
 	fileMounts []FileMount,
 	workspace *WorkspaceMount,
+	gpu GPUVendor,
 ) string {
 	var b strings.Builder
 
@@ -84,6 +86,11 @@ func (s *SeatbeltBackend) buildSeatbeltProfile(
 	b.WriteString("(allow mach-lookup)\n")
 	b.WriteString("(allow ipc-posix-shm)\n")
 	b.WriteString("(allow file-read-metadata)\n\n")
+
+	if gpu != GPUNone {
+		b.WriteString("(allow iokit-open)\n")
+		b.WriteString("(allow device-open)\n\n")
+	}
 
 	b.WriteString("(allow file-read*\n")
 	for _, p := range systemReadPaths {

@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/amadejkastelic/nix-exec/internal/config"
 )
@@ -24,22 +26,31 @@ func (b *BwrapBackend) Run(
 	envVars []string,
 	fileMounts []FileMount,
 	workspace *WorkspaceMount,
+	gpu GPUVendor,
 ) (*RunResult, error) {
-	args := b.buildBwrapArgs(command, envPath, tmpDir, fileMounts, workspace)
+	args, gpuEnv, err := b.buildBwrapArgs(command, envPath, tmpDir, fileMounts, workspace, gpu)
+	if err != nil {
+		return nil, fmt.Errorf("build sandbox args: %w", err)
+	}
+
+	finalEnv := envVars
+	for k, v := range gpuEnv {
+		finalEnv = append(finalEnv, k+"="+v)
+	}
 
 	b.logger.Debug("running sandboxed command",
 		"args", args,
-		"env_vars", envVars,
+		"env_vars", finalEnv,
 	)
 
 	cmd := exec.CommandContext(ctx, "bwrap", args...)
-	cmd.Env = envVars
+	cmd.Env = finalEnv
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 
 	result := &RunResult{
 		Stdout:   truncate(stdout.String(), b.config.Sandbox.MaxOutputBytes),
@@ -69,7 +80,8 @@ func (b *BwrapBackend) buildBwrapArgs(
 	tmpDir string,
 	fileMounts []FileMount,
 	workspace *WorkspaceMount,
-) []string {
+	gpu GPUVendor,
+) ([]string, map[string]string, error) {
 	args := []string{
 		"--unshare-all",
 		"--die-with-parent",
@@ -100,8 +112,48 @@ func (b *BwrapBackend) buildBwrapArgs(
 		}
 	}
 
+	gpuEnv := make(map[string]string)
+	if gpu != GPUNone {
+		resolved, err := ResolveGPU(gpu)
+		if err != nil {
+			return nil, nil, fmt.Errorf("resolve gpu: %w", err)
+		}
+
+		paths, err := GetGPUDriverPaths(resolved)
+		if err != nil {
+			return nil, nil, fmt.Errorf("gpu driver paths: %w", err)
+		}
+
+		driNeeded := false
+		for _, dev := range paths.Devices {
+			if strings.HasPrefix(dev, "/dev/dri/") {
+				driNeeded = true
+			}
+		}
+		if driNeeded {
+			args = append(args, "--dir", "/dev/dri")
+		}
+
+		for _, dev := range paths.Devices {
+			args = append(args, "--dev-bind", dev, dev)
+		}
+
+		for _, dir := range paths.LibDirs {
+			mountPoint := dir
+			args = append(args, "--ro-bind", dir, mountPoint)
+		}
+
+		if _, err := os.Stat("/sys"); err == nil {
+			args = append(args, "--ro-bind", "/sys", "/sys")
+		}
+
+		for k, v := range paths.EnvVars {
+			gpuEnv[k] = v
+		}
+	}
+
 	args = append(args, "--")
 	args = append(args, command...)
 
-	return args
+	return args, gpuEnv, nil
 }

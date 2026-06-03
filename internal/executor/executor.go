@@ -51,6 +51,7 @@ func (e *Executor) RunCode(
 	envVars map[string]string,
 	fileMounts []sandbox.FileMount,
 	workspace *sandbox.WorkspaceMount,
+	gpu sandbox.GPUVendor,
 ) (*ExecutionResult, error) {
 	interpreter, err := resolveInterpreter(lang)
 	if err != nil {
@@ -124,6 +125,7 @@ func (e *Executor) RunCode(
 		sandboxEnv,
 		fileMounts,
 		workspace,
+		gpu,
 	)
 	if err != nil {
 		return nil, err

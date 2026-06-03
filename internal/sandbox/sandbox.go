@@ -35,6 +35,7 @@ type Backend interface {
 		envVars []string,
 		fileMounts []FileMount,
 		workspace *WorkspaceMount,
+		gpu GPUVendor,
 	) (*RunResult, error)
 }
 
@@ -67,8 +68,9 @@ func (s *Sandbox) Run(
 	envVars []string,
 	fileMounts []FileMount,
 	workspace *WorkspaceMount,
+	gpu GPUVendor,
 ) (*RunResult, error) {
-	return s.backend.Run(ctx, command, envPath, tmpDir, envVars, fileMounts, workspace)
+	return s.backend.Run(ctx, command, envPath, tmpDir, envVars, fileMounts, workspace, gpu)
 }
 
 func truncate(s string, maxBytes int64) string {

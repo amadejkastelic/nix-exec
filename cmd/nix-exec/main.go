@@ -101,6 +101,13 @@ func main() {
 			),
 			mcp.Items(map[string]any{"type": "string"}),
 		),
+		mcp.WithString(
+			"gpu",
+			mcp.Description(
+				"GPU passthrough mode for accelerated computation. 'auto' auto-detects available GPU hardware. Default is no GPU passthrough.",
+			),
+			mcp.Enum("none", "nvidia", "amd", "intel", "auto"),
+		),
 	)
 
 	s.AddTool(
@@ -145,6 +152,12 @@ func main() {
 				)
 			}
 
+			gpuStr := request.GetString("gpu", "none")
+			gpuVendor, err := sandbox.ParseGPUVendor(gpuStr)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
 			var workspace *sandbox.WorkspaceMount
 			if cfg.Sandbox.WorkspacePath != "" {
 				workspace = &sandbox.WorkspaceMount{
@@ -155,7 +168,11 @@ func main() {
 				workspace = resolveWorkspace(ctx, s, cwd, logger)
 			}
 
-			logger.Info("executing code", "language", language, "packages", packages)
+			logger.Info("executing code",
+				"language", language,
+				"packages", packages,
+				"gpu", gpuVendor,
+			)
 
 			ctx, cancel := context.WithTimeout(ctx, cfg.Sandbox.Timeout)
 			defer cancel()
@@ -168,6 +185,7 @@ func main() {
 				envVars,
 				fileMounts,
 				workspace,
+				gpuVendor,
 			)
 			if err != nil {
 				logger.Error("execution failed", "error", err)
